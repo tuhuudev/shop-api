@@ -1,29 +1,36 @@
 package com.learn.shopapi;
 
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Lop cha cho integration test (@SpringBootTest): chay tren PostgreSQL THAT qua Testcontainers,
  * KHONG dung H2. Nho the SQL native (vd to_char), kieu cot, Flyway... duoc kiem dung moi truong prod.
  *
- * @ServiceConnection: Spring Boot tu tro datasource toi container -> Flyway chay V1..V4 tao schema + seed.
- * @Testcontainers la @Inherited nen cac subclass dung chung container static nay (chi khoi 1 lan / JVM).
+ * SINGLETON CONTAINER: container la static + start MOT lan trong static block, KHONG dung @Container
+ * (neu dung @Container, extension se stop() container sau test class DAU TIEN -> cac class sau dung
+ * context cache lai mat ket noi "Connection refused"). Khong goi stop() -> Ryuk don khi JVM thoat.
  *
- * disabledWithoutDocker=true: neu moi truong KHONG co Docker kha dung, cac test nay duoc SKIP (khong fail).
- * Huu ich cho Windows/Docker Desktop co luc khong ket noi duoc qua named pipe; tren CI (Linux) van chay day du.
+ * @ServiceConnection: Spring Boot tu tro datasource/redis toi container -> Flyway chay V1..V9.
+ * @Testcontainers(disabledWithoutDocker=true): neu KHONG co Docker (vd Windows npipe), cac test SKIP.
+ * Static block chi start khi Docker san co -> tranh ne ngoai le luc nap lop khi khong co Docker.
  */
 @Testcontainers(disabledWithoutDocker = true)
 public abstract class AbstractIntegrationTest {
 
-    @Container
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
 
-    @Container
     @ServiceConnection(name = "redis")
     static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7").withExposedPorts(6379);
+
+    static {
+        if (DockerClientFactory.instance().isDockerAvailable()) {
+            POSTGRES.start();
+            REDIS.start();
+        }
+    }
 }
