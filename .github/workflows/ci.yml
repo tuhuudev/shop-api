@@ -19,6 +19,13 @@ jobs:
           java-version: '21'
           cache: maven
 
+      # Khoa RS256 dev KHONG commit (xem .gitignore) -> sinh khoa ephemeral cho test.
+      - name: Generate dev JWT keys
+        run: |
+          mkdir -p src/main/resources/keys
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out src/main/resources/keys/jwt-private.pem
+          openssl rsa -pubout -in src/main/resources/keys/jwt-private.pem -out src/main/resources/keys/jwt-public.pem
+
       # verify = compile + test (unit + integration Testcontainers + ArchUnit) + Checkstyle + Enforcer.
       # Runner Linux co Docker san -> Testcontainers (Postgres + Redis) chay that.
       - name: Build & verify
@@ -43,6 +50,12 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+
+      - name: Generate dev JWT keys
+        run: |
+          mkdir -p src/main/resources/keys
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out src/main/resources/keys/jwt-private.pem
+          openssl rsa -pubout -in src/main/resources/keys/jwt-private.pem -out src/main/resources/keys/jwt-public.pem
 
       # NVD_API_KEY (secret) giup OWASP tai du lieu CVE nhanh hon. -DskipTests vi job nay chi quet.
       - name: Security & coverage scans
