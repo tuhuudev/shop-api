@@ -30,21 +30,18 @@ services:
       - key: SPRING_DATASOURCE_PASSWORD
         sync: false
 
-      # --- Redis (Upstash) - bat buoc TLS ---
+      # --- Redis - host/port/password dat trong Dashboard (sync:false).
+      # TLS: KHONG ep o day. App mac dinh SSL=false (Redis Cloud free dung redis:// khong TLS).
+      # Neu Redis co TLS (rediss://, vd Upstash) -> them env SPRING_DATA_REDIS_SSL_ENABLED=true. ---
       - key: SPRING_DATA_REDIS_HOST
         sync: false
       - key: SPRING_DATA_REDIS_PORT
         sync: false
       - key: SPRING_DATA_REDIS_PASSWORD
         sync: false
-      - key: SPRING_DATA_REDIS_SSL_ENABLED
-        value: "true"
 
-      # --- Khoa RS256: tai len qua Render "Secret Files" (xem DEPLOY.md) ---
-      - key: APP_JWT_PRIVATE_KEY
-        value: file:/etc/secrets/jwt-private.pem
-      - key: APP_JWT_PUBLIC_KEY
-        value: file:/etc/secrets/jwt-public.pem
+      # Khoa RS256 dev duoc BAKE vao image luc build (xem Dockerfile) -> dung classpath mac dinh,
+      # KHONG can Secret Files. (Demo: redeploy se sinh khoa moi -> token cu het han.)
 
       # --- Secret webhook thanh toan: Render tu sinh ngau nhien (xem o Dashboard de test) ---
       - key: APP_PAYMENTS_WEBHOOK_SECRET

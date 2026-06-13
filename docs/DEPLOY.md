@@ -29,23 +29,20 @@ PostgreSQL trên **Neon**, Redis trên **Upstash**. Thời gian ~30 phút.
    - `SPRING_DATA_REDIS_PASSWORD = <token>`
    - `SPRING_DATA_REDIS_SSL_ENABLED = true`  (Upstash bắt buộc TLS — đã set sẵn trong `render.yaml`)
 
-## 3. Sinh khóa RS256 (chạy local, KHÔNG commit)
-```powershell
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-private.pem
-openssl rsa -pubout -in jwt-private.pem -out jwt-public.pem
-```
-Giữ 2 file này để dán vào Render ở bước sau.
+## 3. Khóa RS256 — KHÔNG cần làm gì
+Dockerfile tự sinh khóa dev lúc build (bake vào image) → dùng classpath mặc định, **không cần
+Secret Files**. (Tradeoff demo: mỗi lần redeploy sinh khóa mới → token/refresh cũ hết hiệu lực,
+user đăng nhập lại. Prod thật nên inject khóa qua secret/file mount thay vì bake.)
 
 ## 4. Render — tạo service từ Blueprint
 1. https://render.com → **New → Blueprint** → kết nối repo `tuhuudev/shop-api` (Render đọc `render.yaml`).
-2. Render hỏi các env `sync:false` → điền giá trị từ bước 1 & 2 (Neon + Upstash).
-   - `APP_CORS_ALLOWED_ORIGINS` = origin frontend thật (vd `https://shop-client.example.com`); để trống nếu chỉ test API.
+2. Render hỏi các env `sync:false` → điền giá trị từ bước 1 & 2 (Neon + Redis).
+   - Redis non-TLS (Redis Cloud free `redis://`): KHÔNG cần set SSL (app mặc định false).
+     Nếu Redis có TLS (`rediss://`, vd Upstash) → thêm env `SPRING_DATA_REDIS_SSL_ENABLED=true`.
+   - `APP_CORS_ALLOWED_ORIGINS` = origin frontend thật (vd `https://shop-client.example.com`); **để trống nếu chỉ test API** (Swagger same-origin vẫn chạy).
    - `APP_PAYMENTS_WEBHOOK_SECRET` Render **tự sinh** — xem giá trị trong Dashboard nếu cần test webhook.
-3. **Secret Files** (Dashboard → service → *Environment* → *Secret Files*) — thêm 2 file đúng path:
-   - `/etc/secrets/jwt-private.pem` ← nội dung `jwt-private.pem`
-   - `/etc/secrets/jwt-public.pem` ← nội dung `jwt-public.pem`
-   (env `APP_JWT_PRIVATE_KEY/PUBLIC_KEY` đã trỏ tới 2 path này trong `render.yaml`.)
-4. **Create** → Render build Docker image + deploy. Lần đầu ~5–8 phút.
+3. **Create** → Render build Docker image (tự sinh khóa RS256) + deploy. Lần đầu ~5–8 phút.
+   Không cần Secret Files.
 
 ## 5. Kiểm tra
 - Health: `https://<app>.onrender.com/actuator/health/liveness` → `{"status":"UP"}`

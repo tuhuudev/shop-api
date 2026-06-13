@@ -5,6 +5,12 @@ WORKDIR /app
 COPY pom.xml .
 RUN mvn -B -q dependency:go-offline
 COPY src ./src
+# Sinh khoa RS256 dev BAKE vao image (demo) -> app dung classpath:keys/*.pem, KHONG can secret rieng.
+# Tradeoff: redeploy = khoa moi = token cu het hieu luc. Prod that nen inject khoa qua secret/file mount.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && mkdir -p src/main/resources/keys \
+    && openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out src/main/resources/keys/jwt-private.pem \
+    && openssl rsa -pubout -in src/main/resources/keys/jwt-private.pem -out src/main/resources/keys/jwt-public.pem
 RUN mvn -B -q -DskipTests package
 
 # ---- Run stage: chi can JRE 21, nhe ----
