@@ -2,6 +2,7 @@ package com.learn.shopapi.controller;
 
 import com.learn.shopapi.dto.CartItemRequest;
 import com.learn.shopapi.dto.CartResponse;
+import com.learn.shopapi.dto.CheckoutRequest;
 import com.learn.shopapi.dto.OrderResponse;
 import com.learn.shopapi.service.CartService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -57,9 +58,12 @@ public class CartController {
 
     @PostMapping("/checkout")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Dat hang tu gio (ho tro Idempotency-Key de retry an toan)")
+    @Operation(summary = "Dat hang tu gio (couponCode + dia chi giao tuy chon; Idempotency-Key de retry an toan)")
     public OrderResponse checkout(
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-        return idempotencyService.execute(idempotencyKey, cartService::checkout);
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestBody(required = false) @Valid CheckoutRequest body) {
+        CheckoutRequest req = (body != null) ? body : new CheckoutRequest(null, null);
+        return idempotencyService.execute(idempotencyKey,
+                () -> cartService.checkout(req.couponCode(), req.shipping()));
     }
 }

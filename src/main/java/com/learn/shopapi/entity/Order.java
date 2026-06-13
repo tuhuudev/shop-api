@@ -45,6 +45,17 @@ public class Order extends Auditable {
     @BatchSize(size = 100)
     private List<OrderItem> items = new ArrayList<>();
 
+    // So tien giam tu coupon (0 neu khong dung). totalAmount = tong dong hang - discountAmount.
+    @Column(name = "discount_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "coupon_code", length = 64)
+    private String couponCode;
+
+    // Dia chi giao hang chup luc tao don (cac cot ship_* tren bang orders, deu nullable).
+    @Embedded
+    private ShippingAddress shippingAddress;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
@@ -67,10 +78,22 @@ public class Order extends Auditable {
         recalculateTotal();
     }
 
-    public void recalculateTotal() {
-        this.totalAmount = items.stream()
+    /** Tong tien cac dong hang (truoc giam gia). */
+    public BigDecimal subtotal() {
+        return items.stream()
                 .map(OrderItem::getLineTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public void recalculateTotal() {
+        this.totalAmount = subtotal().subtract(discountAmount);
+    }
+
+    /** Ap giam gia: luu so tien giam + ma coupon, tinh lai tong phai tra. */
+    public void applyDiscount(String couponCode, BigDecimal discountAmount) {
+        this.couponCode = couponCode;
+        this.discountAmount = discountAmount;
+        recalculateTotal();
     }
 
     public Long getId() { return id; }
@@ -79,6 +102,10 @@ public class Order extends Auditable {
     public OrderStatus getStatus() { return status; }
     public void setStatus(OrderStatus status) { this.status = status; }
     public List<OrderItem> getItems() { return items; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public String getCouponCode() { return couponCode; }
+    public ShippingAddress getShippingAddress() { return shippingAddress; }
+    public void setShippingAddress(ShippingAddress shippingAddress) { this.shippingAddress = shippingAddress; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public Long getVersion() { return version; }
 }

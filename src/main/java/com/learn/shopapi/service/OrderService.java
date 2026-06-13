@@ -23,15 +23,18 @@ public class OrderService {
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
     private final InventoryMovementRepository inventoryMovementRepository;
+    private final CouponService couponService;
 
     public OrderService(OrderRepository orderRepository,
                         CustomerRepository customerRepository,
                         ProductRepository productRepository,
-                        InventoryMovementRepository inventoryMovementRepository) {
+                        InventoryMovementRepository inventoryMovementRepository,
+                        CouponService couponService) {
         this.orderRepository = orderRepository;
         this.customerRepository = customerRepository;
         this.productRepository = productRepository;
         this.inventoryMovementRepository = inventoryMovementRepository;
+        this.couponService = couponService;
     }
 
     /**
@@ -47,6 +50,14 @@ public class OrderService {
         Customer customer = resolveCustomer(req.customerId());
         Order order = new Order(customer);
 
+        // Chup dia chi giao hang vao don (neu client gui).
+        if (req.shipping() != null) {
+            var s = req.shipping();
+            order.setShippingAddress(new ShippingAddress(
+                    s.recipient(), s.phone(), s.line1(), s.line2(),
+                    s.city(), s.province(), s.postalCode(), s.country()));
+        }
+
         for (OrderRequest.OrderLine line : req.items()) {
             Product product = productRepository.findById(line.productId())
                     .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay san pham id=" + line.productId()));
@@ -58,6 +69,12 @@ public class OrderService {
                         "San pham '" + product.getName() + "' khong du ton kho");
             }
             order.addItem(new OrderItem(product, line.quantity()));
+        }
+
+        // Ap coupon (neu co) tren subtotal -> set discount + tru luot ATOMIC trong cung tx.
+        if (req.couponCode() != null && !req.couponCode().isBlank()) {
+            String code = req.couponCode().trim();
+            order.applyDiscount(code, couponService.applyToSubtotal(code, order.subtotal()));
         }
 
         Order saved = orderRepository.save(order);
@@ -174,6 +191,20 @@ public class OrderService {
         }
         order.setStatus(OrderStatus.PAID);
         return OrderResponse.from(order);
+    }
+
+    /**
+     * Xac nhan da thanh toan tu CONG THANH TOAN (webhook) - KHONG kiem security context (server-to-server).
+     * Idempotent: don da PAID tro len -> bo qua. Goi trong tx cua PaymentService.
+     */
+    @Transactional
+    public void confirmPaid(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don hang id=" + orderId));
+        if (order.getStatus() == OrderStatus.PENDING) {
+            order.setStatus(OrderStatus.PAID);
+        }
+        // Da PAID/khac -> khong lam gi (callback trung hoac don da xu ly).
     }
 
     // ---- helper ----

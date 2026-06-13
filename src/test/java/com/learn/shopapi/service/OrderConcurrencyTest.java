@@ -53,7 +53,7 @@ class OrderConcurrencyTest extends AbstractIntegrationTest {
             try {
                 startGate.await();   // cho ca 2 luong cung xuat phat
                 orderService.createOrder(new OrderRequest(null,
-                        List.of(new OrderRequest.OrderLine(productId, 1))));
+                        List.of(new OrderRequest.OrderLine(productId, 1)), null, null));
                 success.incrementAndGet();
             } catch (Exception e) {
                 failed.incrementAndGet();   // optimistic lock HOAC het kho

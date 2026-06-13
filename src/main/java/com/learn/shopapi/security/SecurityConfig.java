@@ -66,6 +66,9 @@ public class SecurityConfig {
                     // (nho vay user bi khoa cam token cu se nhan 401 ro rang o /me).
                     auth.requestMatchers("/api/auth/register", "/api/auth/login",
                             "/api/auth/refresh", "/api/auth/logout").permitAll();
+                    // Webhook cong thanh toan: goi server-to-server (khong co JWT) -> xac thuc bang
+                    // chu ky HMAC trong PaymentService, KHONG bao ve bang Spring Security.
+                    auth.requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll();
                     auth.requestMatchers(HttpMethod.GET, "/api/products/**").permitAll();
                     auth.requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll();
                     // Swagger UI + tai lieu OpenAPI

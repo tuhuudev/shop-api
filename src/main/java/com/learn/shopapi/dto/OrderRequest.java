@@ -13,7 +13,13 @@ public record OrderRequest(
         Long customerId,
 
         @NotEmpty(message = "Don hang phai co it nhat 1 san pham")
-        List<@Valid OrderLine> items
+        List<@Valid OrderLine> items,
+
+        // Tuy chon: ma giam gia ap dung cho don.
+        String couponCode,
+
+        // Tuy chon: dia chi giao hang (chup vao don luc tao).
+        @Valid ShippingAddressRequest shipping
 ) {
     public record OrderLine(
             @NotNull Long productId,

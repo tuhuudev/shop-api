@@ -3,6 +3,7 @@ package com.learn.shopapi.service;
 import com.learn.shopapi.dto.CartResponse;
 import com.learn.shopapi.dto.OrderRequest;
 import com.learn.shopapi.dto.OrderResponse;
+import com.learn.shopapi.dto.ShippingAddressRequest;
 import com.learn.shopapi.entity.Cart;
 import com.learn.shopapi.entity.CartItem;
 import com.learn.shopapi.entity.Product;
@@ -85,9 +86,9 @@ public class CartService {
         return CartResponse.from(cart);
     }
 
-    /** Bien gio hang thanh don hang (tru kho), roi xoa rong gio. */
+    /** Bien gio hang thanh don hang (tru kho, ap coupon, chup dia chi giao), roi xoa rong gio. */
     @Transactional
-    public OrderResponse checkout() {
+    public OrderResponse checkout(String couponCode, ShippingAddressRequest shipping) {
         Cart cart = getOrCreateCart();
         if (cart.getItems().isEmpty()) {
             throw new IllegalArgumentException("Gio hang dang trong");
@@ -96,7 +97,7 @@ public class CartService {
                 .map(i -> new OrderRequest.OrderLine(i.getProduct().getId(), i.getQuantity()))
                 .toList();
         // customerId = null -> OrderService tu lay khach tu tai khoan dang dang nhap.
-        OrderResponse order = orderService.createOrder(new OrderRequest(null, lines));
+        OrderResponse order = orderService.createOrder(new OrderRequest(null, lines, couponCode, shipping));
         cart.getItems().clear();   // orphanRemoval = true -> xoa cac cart_items
         return order;
     }

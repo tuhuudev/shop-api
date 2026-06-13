@@ -8,6 +8,7 @@ import com.learn.shopapi.entity.OrderItem;
 import com.learn.shopapi.entity.OrderStatus;
 import com.learn.shopapi.entity.Product;
 import com.learn.shopapi.repository.CustomerRepository;
+import com.learn.shopapi.repository.InventoryMovementRepository;
 import com.learn.shopapi.repository.OrderRepository;
 import com.learn.shopapi.repository.ProductRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -27,15 +28,16 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit test cho OrderService - tap trung vao logic NGHIEP VU (tru kho, het hang).
- * Dung Mockito de gia lap repository: KHONG dung DB that -> chay nhanh, chi kiem logic.
+ * Unit test cho OrderService - tap trung logic NGHIEP VU (tru kho, coupon, doi trang thai).
  *
- * Vi createOrder doc "ai dang dang nhap" tu SecurityContext, ta dat san 1 nguoi dung
- * vai tro CUSTOMER truoc moi test.
+ * LUU Y: tru/hoan kho da chuyen sang UPDATE atomic o DB (ProductRepository.decrementStock/
+ * incrementStock) nen KHONG con sua stock tren entity trong bo nho -> test kiem TUONG TAC
+ * (goi dung repo voi dung tham so) thay vi doc lai stock. Tinh dung khi DONG THOI duoc
+ * kiem rieng o OrderConcurrencyTest (chay tren Postgres that).
  */
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
@@ -43,6 +45,8 @@ class OrderServiceTest {
     @Mock private OrderRepository orderRepository;
     @Mock private CustomerRepository customerRepository;
     @Mock private ProductRepository productRepository;
+    @Mock private InventoryMovementRepository inventoryMovementRepository;
+    @Mock private CouponService couponService;
 
     @InjectMocks private OrderService orderService;
 
@@ -64,16 +68,18 @@ class OrderServiceTest {
         Product kb = new Product("Ban phim", "desc", new BigDecimal("100"), 10, null);
         when(customerRepository.findByUserUsername("customer")).thenReturn(Optional.of(an));
         when(productRepository.findById(1L)).thenReturn(Optional.of(kb));
+        when(productRepository.decrementStock(any(), eq(3))).thenReturn(1);   // du kho
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
         OrderRequest req = new OrderRequest(null,
-                List.of(new OrderRequest.OrderLine(1L, 3)));
+                List.of(new OrderRequest.OrderLine(1L, 3)), null, null);
 
         OrderResponse res = orderService.createOrder(req);
 
-        assertThat(kb.getStockQuantity()).isEqualTo(7);               // 10 - 3
         assertThat(res.totalAmount()).isEqualByComparingTo("300");    // 100 * 3
+        verify(productRepository).decrementStock(any(), eq(3));        // da tru kho atomic
         verify(orderRepository).save(any(Order.class));
+        verify(inventoryMovementRepository).save(any());              // ghi nhat ky xuat kho
     }
 
     @Test
@@ -82,16 +88,38 @@ class OrderServiceTest {
         Product kb = new Product("Ban phim", "desc", new BigDecimal("100"), 2, null);
         when(customerRepository.findByUserUsername("customer")).thenReturn(Optional.of(an));
         when(productRepository.findById(1L)).thenReturn(Optional.of(kb));
+        when(productRepository.decrementStock(any(), eq(5))).thenReturn(0);   // khong du kho
 
         OrderRequest req = new OrderRequest(null,
-                List.of(new OrderRequest.OrderLine(1L, 5)));
+                List.of(new OrderRequest.OrderLine(1L, 5)), null, null);
 
         assertThatThrownBy(() -> orderService.createOrder(req))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("chi con 2");
+                .hasMessageContaining("khong du ton kho");
 
-        assertThat(kb.getStockQuantity()).isEqualTo(2);   // khong bi tru
         verify(orderRepository, never()).save(any());     // khong luu don nao
+    }
+
+    @Test
+    void createOrder_coupon_giamTongTien() {
+        Customer an = new Customer("An", "an@example.com");
+        Product kb = new Product("Ban phim", "desc", new BigDecimal("100"), 10, null);
+        when(customerRepository.findByUserUsername("customer")).thenReturn(Optional.of(an));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(kb));
+        when(productRepository.decrementStock(any(), eq(3))).thenReturn(1);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        // subtotal = 300 -> coupon giam 30
+        when(couponService.applyToSubtotal(eq("SALE"), any())).thenReturn(new BigDecimal("30"));
+
+        OrderRequest req = new OrderRequest(null,
+                List.of(new OrderRequest.OrderLine(1L, 3)), "SALE", null);
+
+        OrderResponse res = orderService.createOrder(req);
+
+        assertThat(res.subtotal()).isEqualByComparingTo("300");
+        assertThat(res.discountAmount()).isEqualByComparingTo("30");
+        assertThat(res.couponCode()).isEqualTo("SALE");
+        assertThat(res.totalAmount()).isEqualByComparingTo("270");
     }
 
     @Test
@@ -120,11 +148,12 @@ class OrderServiceTest {
         Product kb = new Product("Ban phim", "desc", new BigDecimal("100"), 5, null);
         Order order = new Order(new Customer("An", "an@example.com"));
         order.setStatus(OrderStatus.PAID);
-        order.addItem(new OrderItem(kb, 2));   // don mua 2 (kho mo phong van la 5 trong test nay)
+        order.addItem(new OrderItem(kb, 2));   // don mua 2
         when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
         orderService.updateStatus(1L, OrderStatus.CANCELLED);
 
-        assertThat(kb.getStockQuantity()).isEqualTo(7);   // 5 + 2 hoan lai
+        verify(productRepository).incrementStock(any(), eq(2));   // hoan 2 ve kho atomic
+        verify(inventoryMovementRepository).save(any());          // ghi nhat ky restock
     }
 }
