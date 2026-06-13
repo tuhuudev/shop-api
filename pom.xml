@@ -344,6 +344,9 @@
 						<version>10.0.4</version>
 						<configuration>
 							<failBuildOnCVSS>11</failBuildOnCVSS>
+							<!-- Tat OSS Index analyzer: can tai khoan Sonatype, khong co se 401 -> fail build.
+							     NVD van la nguon CVE chinh nen tat cai nay khong giam dang ke do bao phu. -->
+							<ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
 							<formats>
 								<format>HTML</format>
 								<format>JSON</format>

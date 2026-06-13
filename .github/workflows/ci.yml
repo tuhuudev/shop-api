@@ -57,6 +57,14 @@ jobs:
           openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out src/main/resources/keys/jwt-private.pem
           openssl rsa -pubout -in src/main/resources/keys/jwt-private.pem -out src/main/resources/keys/jwt-public.pem
 
+      # Cache du lieu NVD: lan dau tai day (cham), cac lan sau chi cap nhat incremental (nhanh).
+      - name: Cache NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: nvd-${{ github.run_id }}
+          restore-keys: nvd-
+
       # NVD_API_KEY (secret) giup OWASP tai du lieu CVE nhanh hon. -DskipTests vi job nay chi quet.
       - name: Security & coverage scans
         run: ./mvnw -B -Pci verify -DnvdApiKey=${{ secrets.NVD_API_KEY }}
