@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
@@ -35,8 +36,8 @@ public class ReportController {
     }
 
     @GetMapping("/best-sellers")
-    public List<ProductSalesView> bestSellers() {
-        return reportService.bestSellers();
+    public List<ProductSalesView> bestSellers(@RequestParam(defaultValue = "50") int limit) {
+        return reportService.bestSellers(limit);
     }
 
     @GetMapping("/daily-revenue")
@@ -60,15 +61,15 @@ public class ReportController {
     }
 
     @GetMapping("/top-customers")
-    public List<CustomerSpendingView> topCustomers() {
-        return reportService.topCustomers();
+    public List<CustomerSpendingView> topCustomers(@RequestParam(defaultValue = "50") int limit) {
+        return reportService.topCustomers(limit);
     }
 
     /** Xuat bao cao ban chay ra CSV de tai ve (Content-Disposition: attachment). */
     @GetMapping(value = "/best-sellers/csv", produces = "text/csv")
     public ResponseEntity<String> bestSellersCsv() {
         StringBuilder sb = new StringBuilder("productName,totalQuantity,totalRevenue\n");
-        for (ProductSalesView v : reportService.bestSellers()) {
+        for (ProductSalesView v : reportService.bestSellers(1000)) {
             sb.append(escape(v.getProductName())).append(',')
               .append(v.getTotalQuantity()).append(',')
               .append(v.getTotalRevenue()).append('\n');

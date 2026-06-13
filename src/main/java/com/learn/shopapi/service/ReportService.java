@@ -24,8 +24,8 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProductSalesView> bestSellers() {
-        return orderRepository.findBestSellingProducts();
+    public List<ProductSalesView> bestSellers(int limit) {
+        return orderRepository.findBestSellingProducts(limit);
     }
 
     @Transactional(readOnly = true)
@@ -49,7 +49,7 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
-    public List<CustomerSpendingView> topCustomers() {
-        return orderRepository.findTopCustomers();
+    public List<CustomerSpendingView> topCustomers(int limit) {
+        return orderRepository.findTopCustomers(limit);
     }
 }

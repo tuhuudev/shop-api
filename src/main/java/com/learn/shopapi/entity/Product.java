@@ -2,6 +2,7 @@ package com.learn.shopapi.entity;
 
 import com.learn.shopapi.common.Auditable;
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
@@ -22,6 +23,9 @@ import java.math.BigDecimal;
 @Table(name = "products", indexes = @Index(name = "idx_products_category", columnList = "category_id"))
 @SQLDelete(sql = "UPDATE products SET deleted = true WHERE id = ?")
 @SQLRestriction("deleted = false")
+// Batch loading: khi nap nhieu OrderItem.product LAZY cung luc, Hibernate gom thanh vai cau IN
+// thay vi N query (chong N+1 o list don hang).
+@BatchSize(size = 100)
 public class Product extends Auditable {
 
     @Id

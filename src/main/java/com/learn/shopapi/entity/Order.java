@@ -2,6 +2,7 @@ package com.learn.shopapi.entity;
 
 import com.learn.shopapi.common.Auditable;
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -40,6 +41,8 @@ public class Order extends Auditable {
     // cascade = ALL: luu/xoa Order thi cac OrderItem cung tu dong theo.
     // orphanRemoval = true: xoa item khoi list -> xoa luon trong DB.
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    // Batch loading: nap items cua nhieu Order trong 1 trang bang vai cau IN (chong N+1).
+    @BatchSize(size = 100)
     private List<OrderItem> items = new ArrayList<>();
 
     @Column(nullable = false, precision = 12, scale = 2)

@@ -9,10 +9,12 @@ import com.learn.shopapi.entity.Order;
 import com.learn.shopapi.entity.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
@@ -20,7 +22,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByCustomerId(Long customerId);
 
+    // Chi tiet 1 don: fetch join customer + items + product trong 1 query (khong N+1).
+    @Override
+    @EntityGraph(attributePaths = {"customer", "items", "items.product"})
+    Optional<Order> findById(Long id);
+
+    // List phan trang: nap kem customer (ToOne, an toan voi paging); items/product nap theo
+    // @BatchSize tren entity -> vai cau IN thay vi N+1. KHONG fetch collection o day de tranh
+    // phan trang trong bo nho (HHH000104).
+    @Override
+    @EntityGraph(attributePaths = "customer")
+    Page<Order> findAll(Pageable pageable);
+
     // Phan trang don hang cua RIENG 1 tai khoan (CUSTOMER chi xem don cua minh).
+    @EntityGraph(attributePaths = "customer")
     Page<Order> findByCustomerUserUsername(String username, Pageable pageable);
 
     /**
@@ -38,8 +53,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             WHERE o.status <> 'CANCELLED'
             GROUP BY p.id, p.name
             ORDER BY totalRevenue DESC
+            LIMIT :limit
             """, nativeQuery = true)
-    List<ProductSalesView> findBestSellingProducts();
+    List<ProductSalesView> findBestSellingProducts(@Param("limit") int limit);
 
     /**
      * BAO CAO 2: Doanh thu theo ngay (Postgres: to_char cat phan ngay yyyy-MM-dd).
@@ -93,8 +109,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             """, nativeQuery = true)
     List<MonthlyRevenueView> findRevenueByMonth();
 
-    /** BAO CAO: khach chi tieu nhieu nhat (top N truyen qua LIMIT cua Spring/Pageable thi phuc tap;
-        o day lay tat ca, sap xep giam dan - client co the cat). */
+    /** BAO CAO: khach chi tieu nhieu nhat (top N qua LIMIT - tranh tra ve toan bo bang). */
     @Query(value = """
             SELECT cu.name             AS customerName,
                    COUNT(o.id)         AS orderCount,
@@ -104,6 +119,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             WHERE o.status <> 'CANCELLED'
             GROUP BY cu.id, cu.name
             ORDER BY totalSpent DESC
+            LIMIT :limit
             """, nativeQuery = true)
-    List<CustomerSpendingView> findTopCustomers();
+    List<CustomerSpendingView> findTopCustomers(@Param("limit") int limit);
 }

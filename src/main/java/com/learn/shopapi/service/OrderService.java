@@ -46,13 +46,12 @@ public class OrderService {
             Product product = productRepository.findById(line.productId())
                     .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay san pham id=" + line.productId()));
 
-            if (product.getStockQuantity() < line.quantity()) {
+            // Tru kho ATOMIC: dieu kien du kho nam trong UPD...WHERE stock>=qty -> khong race,
+            // khong can optimistic-lock/retry. updated==0 => khong du ton kho.
+            if (productRepository.decrementStock(product.getId(), line.quantity()) == 0) {
                 throw new IllegalArgumentException(
-                        "San pham '" + product.getName() + "' chi con " + product.getStockQuantity() + " trong kho");
+                        "San pham '" + product.getName() + "' khong du ton kho");
             }
-            // tru ton kho
-            product.setStockQuantity(product.getStockQuantity() - line.quantity());
-
             order.addItem(new OrderItem(product, line.quantity()));
         }
 
@@ -99,11 +98,10 @@ public class OrderService {
         return OrderResponse.from(order);
     }
 
-    /** Cong tra so luong cua tung dong hang ve ton kho (khi huy don). */
+    /** Cong tra so luong cua tung dong hang ve ton kho (khi huy don) - ATOMIC tai DB. */
     private void restock(Order order) {
         for (OrderItem item : order.getItems()) {
-            Product product = item.getProduct();
-            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+            productRepository.incrementStock(item.getProduct().getId(), item.getQuantity());
         }
     }
 

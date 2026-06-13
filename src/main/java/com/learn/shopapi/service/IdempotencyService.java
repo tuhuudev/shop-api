@@ -1,5 +1,6 @@
 package com.learn.shopapi.service;
 
+import com.learn.shopapi.security.SecurityUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -32,15 +33,18 @@ public class IdempotencyService {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return action.get();   // khong dung idempotency
         }
-        String resultKey = RESULT_PREFIX + idempotencyKey;
+        // Scope theo user dang dang nhap: 2 user gui cung key (vd "1") KHONG duoc dung chung
+        // ket qua -> tranh tra ve don/ket qua cua nguoi khac.
+        String scoped = SecurityUtils.getCurrentUsername().orElse("anon") + ":" + idempotencyKey;
+        String resultKey = RESULT_PREFIX + scoped;
+        String lockKey = LOCK_PREFIX + scoped;
 
         Object cached = redis.opsForValue().get(resultKey);
         if (cached != null) {
             return (T) cached;     // da xu ly truoc do -> tra ket qua cu
         }
         // Khoa "dang xu ly": neu khong gianh duoc -> co request cung key dang chay -> tu choi.
-        Boolean acquired = redis.opsForValue()
-                .setIfAbsent(LOCK_PREFIX + idempotencyKey, "1", LOCK_TTL);
+        Boolean acquired = redis.opsForValue().setIfAbsent(lockKey, "1", LOCK_TTL);
         if (Boolean.FALSE.equals(acquired)) {
             throw new IllegalStateException("Yeu cau trung dang duoc xu ly, vui long thu lai sau");
         }
@@ -49,11 +53,11 @@ public class IdempotencyService {
         try {
             result = action.get();
         } catch (RuntimeException e) {
-            redis.delete(LOCK_PREFIX + idempotencyKey);   // tha lock de retry duoc neu that bai
+            redis.delete(lockKey);   // tha lock de retry duoc neu that bai
             throw e;
         }
         redis.opsForValue().set(resultKey, result, RESULT_TTL);
-        redis.delete(LOCK_PREFIX + idempotencyKey);
+        redis.delete(lockKey);
         return result;
     }
 }
