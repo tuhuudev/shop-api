@@ -1,0 +1,86 @@
+package com.learn.shopapi.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Bat loi cho TOAN BO controller o mot cho duy nhat -> tra ve theo chuan RFC 7807
+ * (ProblemDetail, content-type application/problem+json). Nho vay client xu ly loi nhat quan.
+ */
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    // Khong tim thay -> 404
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ProblemDetail handleNotFound(ResourceNotFoundException ex) {
+        return problem(HttpStatus.NOT_FOUND, "Khong tim thay", ex.getMessage());
+    }
+
+    // Vi pham nghiep vu (vi du het hang) -> 400
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleBadRequest(IllegalArgumentException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Yeu cau khong hop le", ex.getMessage());
+    }
+
+    // Sai username/mat khau hoac refresh token khong hop le -> 401
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleAuth(AuthenticationException ex) {
+        return problem(HttpStatus.UNAUTHORIZED, "Xac thuc that bai", ex.getMessage());
+    }
+
+    // Dang nhap sai qua nhieu lan -> 429 Too Many Requests
+    @ExceptionHandler(TooManyAttemptsException.class)
+    public ProblemDetail handleTooMany(TooManyAttemptsException ex) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, "Qua nhieu yeu cau", ex.getMessage());
+    }
+
+    // Du phong: neu RefreshTokenReuseException loi ra ngoai (binh thuong da xu ly o AuthService) -> 401
+    @ExceptionHandler(RefreshTokenReuseException.class)
+    public ProblemDetail handleReuse(RefreshTokenReuseException ex) {
+        return problem(HttpStatus.UNAUTHORIZED, "Xac thuc that bai", ex.getMessage());
+    }
+
+    // Xung dot ghi dong thoi (optimistic locking) -> 409 Conflict. Client co the thu lai.
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        return problem(HttpStatus.CONFLICT, "Xung dot du lieu",
+                "Du lieu vua bi thay doi boi mot thao tac khac, vui long thu lai");
+    }
+
+    // JSON gui len sai dinh dang / thieu field bat buoc -> 400
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Body khong doc duoc",
+                "Body JSON khong hop le hoac thieu truong bat buoc");
+    }
+
+    // Validation that bai (@NotBlank, @Positive...) -> 400 kem chi tiet tung field
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
+        Map<String, String> fieldErrors = new HashMap<>();
+        ex.getBindingResult().getFieldErrors()
+                .forEach(e -> fieldErrors.put(e.getField(), e.getDefaultMessage()));
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Du lieu khong hop le",
+                "Mot so truong khong dat yeu cau");
+        pd.setProperty("errors", fieldErrors);
+        return pd;
+    }
+
+    /** Tao ProblemDetail chuan, them moc thoi gian. */
+    private ProblemDetail problem(HttpStatus status, String title, String detail) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
+        pd.setTitle(title);
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+}

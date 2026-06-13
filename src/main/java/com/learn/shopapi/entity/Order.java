@@ -1,0 +1,73 @@
+package com.learn.shopapi.entity;
+
+import com.learn.shopapi.common.Auditable;
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Order = mot don hang.
+ * Luu y: bang ten "orders" vi ORDER la tu khoa reserved trong SQL.
+ *
+ * - 1 Order thuoc 1 Customer            -> Many-to-One
+ * - 1 Order co nhieu dong hang OrderItem -> One-to-Many
+ * - Ke thua Auditable: tu co created_at/created_by (ai tao don, luc nao).
+ */
+@Entity
+@Table(name = "orders")
+public class Order extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id", nullable = false)
+    private Customer customer;
+
+    @Column(nullable = false)
+    private LocalDateTime orderDate;
+
+    @Enumerated(EnumType.STRING) // luu chuoi "PENDING" thay vi so 0,1,2 -> de doc
+    @Column(nullable = false)
+    private OrderStatus status;
+
+    // cascade = ALL: luu/xoa Order thi cac OrderItem cung tu dong theo.
+    // orphanRemoval = true: xoa item khoi list -> xoa luon trong DB.
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items = new ArrayList<>();
+
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    protected Order() { }
+
+    public Order(Customer customer) {
+        this.customer = customer;
+        this.orderDate = LocalDateTime.now();
+        this.status = OrderStatus.PENDING;
+    }
+
+    /** Them 1 dong hang va cap nhat tong tien. Giu 2 chieu quan he dong bo. */
+    public void addItem(OrderItem item) {
+        items.add(item);
+        item.setOrder(this);
+        recalculateTotal();
+    }
+
+    public void recalculateTotal() {
+        this.totalAmount = items.stream()
+                .map(OrderItem::getLineTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public Long getId() { return id; }
+    public Customer getCustomer() { return customer; }
+    public LocalDateTime getOrderDate() { return orderDate; }
+    public OrderStatus getStatus() { return status; }
+    public void setStatus(OrderStatus status) { this.status = status; }
+    public List<OrderItem> getItems() { return items; }
+    public BigDecimal getTotalAmount() { return totalAmount; }
+}

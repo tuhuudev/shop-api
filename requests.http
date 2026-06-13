@@ -1,0 +1,232 @@
+### File request mau. Mo bang VS Code + extension "REST Client" roi bam "Send Request".
+### Luu y: gio API CO PHAN QUYEN. Hay chay request "Dang nhmap" truoc de lay token,
+### REST Client se tu nho token qua bien {{login.response.body.$.accessToken}}.
+
+@host = http://localhost:8080
+
+### ====================== XAC THUC ======================
+
+### Dang ky tai khoan moi (role CUSTOMER) - tra ve luon token
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "newuser",
+  "password": "secret123",
+  "email": "newuser@example.com",
+  "fullName": "Nguoi Dung Moi"
+}
+
+### Dang nhap ADMIN (dat ten @login de cac request sau dung token nay)
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+### Dang nhap CUSTOMER
+# @name loginCustomer
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "username": "customer", "password": "customer123" }
+
+### Thong tin tai khoan dang dang nhap
+GET {{host}}/api/auth/me
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Xin access token moi tu refresh token
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{login.response.body.$.refreshToken}}" }
+
+### ====================== SAN PHAM ======================
+
+### Danh sach san pham (CONG KHAI - khong can token), co phan trang + sap xep
+GET {{host}}/api/products?page=0&size=5&sort=price,desc
+
+### Loc san pham theo ten + khoang gia + danh muc
+GET {{host}}/api/products?search=iphone&minPrice=1000000&maxPrice=30000000&categoryId=1
+
+### Chi tiet 1 san pham (cong khai)
+GET {{host}}/api/products/1
+
+### Tao san pham moi (CAN STAFF/ADMIN)
+POST {{host}}/api/products
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+{
+  "name": "iPad Air",
+  "description": "May tinh bang Apple",
+  "price": 16990000,
+  "stockQuantity": 30,
+  "categoryId": 2
+}
+
+### Tao san pham bang token CUSTOMER -> 403 Forbidden (de kiem chung phan quyen)
+POST {{host}}/api/products
+Content-Type: application/json
+Authorization: Bearer {{loginCustomer.response.body.$.accessToken}}
+
+{ "name": "Hang cam", "price": 1000, "stockQuantity": 1, "categoryId": 1 }
+
+### Cap nhat san pham (STAFF/ADMIN)
+PUT {{host}}/api/products/1
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+{
+  "name": "iPhone 15 Pro",
+  "description": "Ban nang cap",
+  "price": 28990000,
+  "stockQuantity": 45,
+  "categoryId": 1
+}
+
+### Xoa MEM san pham (STAFF/ADMIN) - sau do GET danh sach se khong con thay no
+DELETE {{host}}/api/products/4
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### ====================== DON HANG ======================
+
+### CUSTOMER tao don cho CHINH MINH (khong gui customerId)
+POST {{host}}/api/orders
+Content-Type: application/json
+Authorization: Bearer {{loginCustomer.response.body.$.accessToken}}
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 },
+    { "productId": 4, "quantity": 2 }
+  ]
+}
+
+### ADMIN/STAFF dat ho khach khac (duoc phep gui customerId)
+POST {{host}}/api/orders
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+{
+  "customerId": 2,
+  "items": [ { "productId": 3, "quantity": 1 } ]
+}
+
+### Danh sach don (CUSTOMER chi thay don cua minh; STAFF/ADMIN thay tat ca)
+GET {{host}}/api/orders?page=0&size=10
+Authorization: Bearer {{loginCustomer.response.body.$.accessToken}}
+
+### Doi trang thai don hang (CHI STAFF/ADMIN)
+PATCH {{host}}/api/orders/1/status
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+{ "status": "PAID" }
+
+### ====================== BAO CAO (CHI STAFF/ADMIN) ======================
+
+### San pham ban chay nhat
+GET {{host}}/api/reports/best-sellers
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Doanh thu theo ngay
+GET {{host}}/api/reports/daily-revenue
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Tong doanh thu
+GET {{host}}/api/reports/total-revenue
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### ====================== QUAN TRI USER (CHI ADMIN) ======================
+
+### Danh sach user (phan trang)
+GET {{host}}/api/admin/users?page=0&size=10
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Gan lai vai tro cho user id=3
+PUT {{host}}/api/admin/users/3/roles
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+["CUSTOMER", "STAFF"]
+
+### Khoa tai khoan user id=3
+PATCH {{host}}/api/admin/users/3/enabled?enabled=false
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Nhat ky dang nhap (ADMIN)
+GET {{host}}/api/admin/login-events?size=10
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### ====================== DANH MUC ======================
+
+### Danh sach danh muc (public)
+GET {{host}}/api/categories
+
+### Tao danh muc (STAFF/ADMIN)
+POST {{host}}/api/categories
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+{ "name": "Phu kien" }
+
+### ====================== GIO HANG ======================
+
+### Them vao gio (CUSTOMER)
+POST {{host}}/api/cart/items
+Content-Type: application/json
+Authorization: Bearer {{loginCustomer.response.body.$.accessToken}}
+
+{ "productId": 4, "quantity": 2 }
+
+### Xem gio
+GET {{host}}/api/cart
+Authorization: Bearer {{loginCustomer.response.body.$.accessToken}}
+
+### Dat hang tu gio (checkout)
+POST {{host}}/api/cart/checkout
+Authorization: Bearer {{loginCustomer.response.body.$.accessToken}}
+
+### ====================== DANH GIA ======================
+
+### Gui danh gia (can dang nhap)
+POST {{host}}/api/products/1/reviews
+Content-Type: application/json
+Authorization: Bearer {{loginCustomer.response.body.$.accessToken}}
+
+{ "rating": 5, "comment": "San pham tot" }
+
+### Diem trung binh (public)
+GET {{host}}/api/products/1/reviews/summary
+
+### ====================== TAI KHOAN / THANH TOAN ======================
+
+### Doi mat khau
+POST {{host}}/api/auth/change-password
+Content-Type: application/json
+Authorization: Bearer {{loginCustomer.response.body.$.accessToken}}
+
+{ "oldPassword": "customer123", "newPassword": "newpass123" }
+
+### Thanh toan don (mock) -> PAID
+POST {{host}}/api/orders/1/pay
+Authorization: Bearer {{loginCustomer.response.body.$.accessToken}}
+
+### ====================== BAO CAO MO RONG ======================
+
+### Doanh thu theo danh muc
+GET {{host}}/api/reports/revenue-by-category
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Doanh thu theo thang
+GET {{host}}/api/reports/revenue-by-month
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Top khach hang
+GET {{host}}/api/reports/top-customers
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Xuat CSV ban chay
+GET {{host}}/api/reports/best-sellers/csv
+Authorization: Bearer {{login.response.body.$.accessToken}}
