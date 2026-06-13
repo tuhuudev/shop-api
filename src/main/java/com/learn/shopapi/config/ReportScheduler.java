@@ -27,7 +27,7 @@ public class ReportScheduler {
     // cron: giay phut gio ngay thang thu. "0 0 0 * * *" = 00:00:00 moi ngay.
     @Scheduled(cron = "0 0 0 * * *")
     public void logDailyRevenue() {
-        BigDecimal total = reportService.totalRevenue();
+        BigDecimal total = reportService.totalRevenue(null, null);
         log.info("[BAO CAO NGAY] Tong doanh thu hien tai: {}", total);
     }
 }

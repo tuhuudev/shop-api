@@ -64,6 +64,13 @@ public class OrderController {
         return orderService.pay(id);
     }
 
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Khach tu huy don cua minh khi con PENDING (hoan kho)")
+    public OrderResponse cancel(@PathVariable Long id) {
+        return orderService.cancelOwnOrder(id);
+    }
+
     // PATCH chi sua mot phan (o day la trang thai). Vi du body: {"status":"PAID"}
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('STAFF','ADMIN')")

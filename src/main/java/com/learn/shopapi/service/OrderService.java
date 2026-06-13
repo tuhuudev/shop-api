@@ -12,6 +12,7 @@ import com.learn.shopapi.security.SecurityUtils;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -90,12 +91,49 @@ public class OrderService {
             throw new IllegalArgumentException(
                     "Khong the chuyen trang thai tu " + current + " sang " + newStatus);
         }
-        // Huy don -> HOAN KHO so luong da tru luc tao don.
-        if (newStatus == OrderStatus.CANCELLED) {
+        // Huy/hoan tien -> HOAN KHO so luong da tru luc tao don.
+        // An toan da-instance: @Version tren Order khien chi 1 tx chuyen trang thai thanh cong;
+        // tx thua optimistic-lock se rollback CA lenh hoan kho -> khong bao gio hoan kho 2 lan.
+        if (newStatus.isStockReturning()) {
             restock(order);
         }
         order.setStatus(newStatus);
         return OrderResponse.from(order);
+    }
+
+    /**
+     * CUSTOMER tu huy don CUA MINH khi con PENDING (chua thanh toan). Hoan kho.
+     * Don da PAID tro len phai di duong hoan tien (refund) do STAFF/ADMIN xu ly.
+     */
+    @Transactional
+    public OrderResponse cancelOwnOrder(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don hang id=" + id));
+        ensureCanView(order);   // chi chu don (hoac STAFF/ADMIN)
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new IllegalArgumentException(
+                    "Chi huy duoc don dang cho thanh toan (PENDING); don hien o " + order.getStatus());
+        }
+        restock(order);
+        order.setStatus(OrderStatus.CANCELLED);
+        return OrderResponse.from(order);
+    }
+
+    /**
+     * Tu dong huy 1 don PENDING qua han (job quet dinh ky). Chay tx RIENG (REQUIRES_NEW) cho tung don
+     * de 1 don loi khong keo do ca me. Kiem tra lai trang thai + tuoi don ngay trong tx -> tranh
+     * huy nham khi don vua duoc thanh toan. @Version dam bao multi-instance khong huy/hoan kho trung.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean autoCancelStale(Long id, java.time.LocalDateTime cutoff) {
+        Order order = orderRepository.findById(id).orElse(null);
+        if (order == null || order.getStatus() != OrderStatus.PENDING
+                || !order.getOrderDate().isBefore(cutoff)) {
+            return false;
+        }
+        restock(order);
+        order.setStatus(OrderStatus.CANCELLED);
+        return true;
     }
 
     /** Cong tra so luong cua tung dong hang ve ton kho (khi huy don) - ATOMIC tai DB. */
