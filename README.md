@@ -14,6 +14,15 @@ $env:JAVA_HOME = (Get-ChildItem 'C:\Program Files\Eclipse Adoptium' -Directory |
 docker compose up -d db redis      # khoi dong Postgres + Redis
 .\mvnw.cmd spring-boot:run          # app tai http://localhost:8080
 ```
+
+> **Lần đầu clone:** khóa RS256 dev (`src/main/resources/keys/*.pem`) **không** được commit (xem `.gitignore`).
+> Sinh khóa dev trước khi chạy (cần OpenSSL — Git for Windows đã kèm sẵn):
+> ```powershell
+> New-Item -ItemType Directory -Force src/main/resources/keys | Out-Null
+> openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out src/main/resources/keys/jwt-private.pem
+> openssl rsa -pubout -in src/main/resources/keys/jwt-private.pem -out src/main/resources/keys/jwt-public.pem
+> ```
+> Prod **không** dùng file này — override qua env `APP_JWT_PRIVATE_KEY` / `APP_JWT_PUBLIC_KEY`.
 Hoặc chạy trọn gói trong container: `docker compose up --build`.
 
 Flyway tự tạo schema + seed (V1..V5). Mở:
