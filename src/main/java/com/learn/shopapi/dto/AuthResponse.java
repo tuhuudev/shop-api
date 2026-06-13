@@ -18,4 +18,12 @@ public record AuthResponse(
                                   String username, Set<String> roles) {
         return new AuthResponse(accessToken, refreshToken, "Bearer", expiresInMs, username, roles);
     }
+
+    /**
+     * Ban sao KHONG kem refreshToken - dung khi tra ve cho client.
+     * Refresh token duoc gui qua cookie httpOnly (xem RefreshTokenCookie), JS khong thay.
+     */
+    public AuthResponse withoutRefreshToken() {
+        return new AuthResponse(accessToken, null, tokenType, expiresInMs, username, roles);
+    }
 }

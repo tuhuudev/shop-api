@@ -19,6 +19,41 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # verify = compile + test (unit/integration/ArchUnit) + Checkstyle + Enforcer.
+      # verify = compile + test (unit + integration Testcontainers + ArchUnit) + Checkstyle + Enforcer.
+      # Runner Linux co Docker san -> Testcontainers (Postgres + Redis) chay that.
       - name: Build & verify
         run: ./mvnw -B verify
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+
+  scan:
+    # Quet sau (coverage gate + OWASP CVE + SpotBugs/find-sec-bugs). Tach job de khong lam cham PR build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # NVD_API_KEY (secret) giup OWASP tai du lieu CVE nhanh hon. -DskipTests vi job nay chi quet.
+      - name: Security & coverage scans
+        run: ./mvnw -B -Pci verify -DnvdApiKey=${{ secrets.NVD_API_KEY }}
+
+      - name: Upload scan reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-reports
+          path: |
+            target/dependency-check-report.*
+            target/spotbugs*.xml
+            target/site/jacoco/

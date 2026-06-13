@@ -14,6 +14,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -37,19 +38,15 @@ public class SecurityConfig {
     private final RestAuthEntryPoint authEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
 
-    // H2 console mac dinh tat. Chi mo "lo hong" cho H2 khi no that su duoc bat (moi truong dev).
-    private final boolean h2ConsoleEnabled;
     private final List<String> corsAllowedOrigins;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           RestAuthEntryPoint authEntryPoint,
                           RestAccessDeniedHandler accessDeniedHandler,
-                          @Value("${spring.h2.console.enabled:false}") boolean h2ConsoleEnabled,
                           @Value("${app.cors.allowed-origins:}") String corsAllowedOrigins) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.authEntryPoint = authEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
-        this.h2ConsoleEnabled = h2ConsoleEnabled;
         this.corsAllowedOrigins = Arrays.stream(corsAllowedOrigins.split(","))
                 .map(String::trim).filter(s -> !s.isEmpty()).toList();
     }
@@ -76,10 +73,6 @@ public class SecurityConfig {
                     // Actuator: health cong khai (cho health-check); cac endpoint khac chi ADMIN.
                     auth.requestMatchers("/actuator/health/**").permitAll();
                     auth.requestMatchers("/actuator/**").hasRole("ADMIN");
-                    // H2 console: CHI mo khi duoc bat (dev). Tranh de lo o moi truong that.
-                    if (h2ConsoleEnabled) {
-                        auth.requestMatchers("/h2-console/**").permitAll();
-                    }
                     // --- Con lai: bat buoc dang nhap; quyen chi tiet do @PreAuthorize quyet dinh ---
                     auth.anyRequest().authenticated();
                 })
@@ -95,12 +88,12 @@ public class SecurityConfig {
             headers.httpStrictTransportSecurity(hsts -> hsts
                     .includeSubDomains(true).maxAgeInSeconds(31536000));
             // X-Content-Type-Options: nosniff la mac dinh; giu nguyen.
-            // Frame: H2 console can iframe cung nguon goc; ngoai dev thi cam han (chong clickjacking).
-            if (h2ConsoleEnabled) {
-                headers.frameOptions(frame -> frame.sameOrigin());
-            } else {
-                headers.frameOptions(frame -> frame.deny());
-            }
+            // Referrer-Policy: khong gui URL hien tai sang trang khac (tranh lo thong tin qua Referer).
+            headers.referrerPolicy(rp -> rp.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER));
+            // Permissions-Policy: tat cac quyen trinh duyet khong dung den (giam be mat tan cong).
+            headers.permissionsPolicyHeader(pp -> pp.policy("geolocation=(), camera=(), microphone=(), payment=()"));
+            // Chong clickjacking: cam nhung trang khac nhung shop-api vao iframe.
+            headers.frameOptions(frame -> frame.deny());
         });
 
         return http.build();
@@ -116,6 +109,9 @@ public class SecurityConfig {
         config.setAllowedOrigins(corsAllowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Cho phep gui cookie (refresh token httpOnly) kem request cross-origin.
+        // Bat buoc allowedOrigins phai cu the (khong duoc "*") - da dam bao o tren.
+        config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

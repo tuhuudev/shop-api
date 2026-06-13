@@ -87,7 +87,9 @@ public class ProductService {
     }
 
     private Category resolveCategory(Long categoryId) {
-        if (categoryId == null) return null;
+        if (categoryId == null) {
+            return null;
+        }
         return categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay category id=" + categoryId));
     }

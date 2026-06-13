@@ -8,7 +8,10 @@ import jakarta.persistence.*;
  * Ke thua Auditable -> tu co createdAt/createdBy (ai danh gia, luc nao).
  */
 @Entity
-@Table(name = "reviews")
+@Table(name = "reviews", indexes = {
+        @Index(name = "idx_reviews_product", columnList = "product_id"),
+        @Index(name = "idx_reviews_user", columnList = "user_id")
+})
 public class Review extends Auditable {
 
     @Id

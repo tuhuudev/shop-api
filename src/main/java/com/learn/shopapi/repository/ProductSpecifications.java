@@ -22,7 +22,9 @@ public final class ProductSpecifications {
     /** Ten chua tu khoa (khong phan biet hoa thuong). */
     public static Specification<Product> nameContains(String keyword) {
         return (root, query, cb) -> {
-            if (keyword == null || keyword.isBlank()) return cb.conjunction();
+            if (keyword == null || keyword.isBlank()) {
+                return cb.conjunction();
+            }
             return cb.like(cb.lower(root.get("name")), "%" + keyword.toLowerCase() + "%");
         };
     }

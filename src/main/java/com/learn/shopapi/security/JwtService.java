@@ -2,44 +2,52 @@ package com.learn.shopapi.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 
 /**
- * JwtService = "long" tao va kiem tra JWT (JSON Web Token).
+ * JwtService = tao va kiem tra JWT bang RS256 (RSA bat doi xung).
  *
- * JWT gom 3 phan ngan cach dau cham: header.payload.chu_ky
- * - payload chua "claims": subject (username), danh sach quyen, thoi diem het han...
- * - chu_ky duoc ky bang khoa bi mat (HS256). Doi 1 ky tu -> chu_ky sai -> token bi tu choi.
- *   Nho vay server KHONG can luu phien dang nhap (stateless): chi can verify chu_ky.
+ * - Ky bang PRIVATE key, verify bang PUBLIC key -> dich vu khac (gateway/microservice) co the
+ *   verify token chi voi public key ma KHONG can biet private key. An toan hon HS256 (khoa chung).
+ * - Tat ca instance dung CHUNG cap khoa (nap tu file/secret) -> token cua instance nay,
+ *   instance khac verify duoc (multi-instance). KHONG sinh khoa ngau nhien luc chay.
+ * - Khoa dev nam o classpath (keys/*.pem); production tro toi secret qua bien moi truong.
  */
 @Service
 public class JwtService {
 
-    private final SecretKey signingKey;
+    private final PrivateKey privateKey;
+    private final PublicKey publicKey;
     private final long accessTokenExpirationMs;
     private final String issuer;
 
     public JwtService(
-            @Value("${app.jwt.secret}") String secret,
+            @Value("${app.jwt.private-key}") Resource privateKeyResource,
+            @Value("${app.jwt.public-key}") Resource publicKeyResource,
             @Value("${app.jwt.access-token-expiration-ms}") long accessTokenExpirationMs,
             @Value("${app.jwt.issuer}") String issuer) {
-        // secret duoc luu dang base64 trong application.properties -> giai ma ra byte de tao khoa.
-        byte[] keyBytes = Decoders.BASE64.decode(secret);
-        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+        this.privateKey = loadPrivateKey(privateKeyResource);
+        this.publicKey = loadPublicKey(publicKeyResource);
         this.accessTokenExpirationMs = accessTokenExpirationMs;
         this.issuer = issuer;
     }
 
-    /** Tao access token tu thong tin user (username + cac quyen). */
+    /** Tao access token tu thong tin user (username + cac quyen), ky bang private key (RS256). */
     public String generateAccessToken(UserDetails user) {
         List<String> authorities = user.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -52,16 +60,14 @@ public class JwtService {
                 .claim("authorities", authorities)
                 .issuedAt(now)
                 .expiration(expiry)
-                .signWith(signingKey)
+                .signWith(privateKey)   // RSA key -> jjwt dung RS256
                 .compact();
     }
 
-    /** Doc username (subject) tu token. Nem exception neu token sai/het han. */
     public String extractUsername(String token) {
         return parseClaims(token).getSubject();
     }
 
-    /** True neu token hop le (chu ky dung) va chua het han. */
     public boolean isTokenValid(String token) {
         try {
             return parseClaims(token).getExpiration().after(new Date());
@@ -72,10 +78,47 @@ public class JwtService {
 
     private Claims parseClaims(String token) {
         return Jwts.parser()
-                .verifyWith(signingKey)
-                .requireIssuer(issuer)   // tu choi token khong phai do "shop-api" phat hanh
+                .verifyWith(publicKey)        // verify bang public key
+                .requireIssuer(issuer)        // tu choi token khong phai do "shop-api" phat hanh
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    // ---- nap khoa tu PEM ----
+
+    private PrivateKey loadPrivateKey(Resource resource) {
+        byte[] der = pemToDer(read(resource), "PRIVATE KEY");
+        try {
+            return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(der));
+        } catch (Exception e) {
+            throw new IllegalStateException("Khong doc duoc JWT private key", e);
+        }
+    }
+
+    private PublicKey loadPublicKey(Resource resource) {
+        byte[] der = pemToDer(read(resource), "PUBLIC KEY");
+        try {
+            return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(der));
+        } catch (Exception e) {
+            throw new IllegalStateException("Khong doc duoc JWT public key", e);
+        }
+    }
+
+    private String read(Resource resource) {
+        try {
+            return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("Khong mo duoc file khoa JWT: " + resource, e);
+        }
+    }
+
+    /** Bo header/footer/khoang trang cua PEM va base64-decode ra DER. */
+    private byte[] pemToDer(String pem, String type) {
+        String body = pem
+                .replace("-----BEGIN " + type + "-----", "")
+                .replace("-----END " + type + "-----", "")
+                .replaceAll("\\s", "");
+        return Base64.getDecoder().decode(body);
     }
 }

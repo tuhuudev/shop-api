@@ -1,100 +1,71 @@
 # CLAUDE.md — shop-api
 
-## Mục đích
-Project **học tập** của một người **mới bắt đầu** BE & Data. Người dùng giao tiếp tiếng Việt.
-Ưu tiên **giải thích để học**, không chỉ làm hộ. Khi sửa code, nói rõ *vì sao*, liên hệ khái niệm.
+## Mục đích & cách làm việc
+API bán hàng **production-grade**, deploy **multi-instance/k8s**. Người dùng là dev ~7 năm — trao đổi ở
+mức senior: súc tích, tập trung tính đúng đắn/đánh đổi/bảo mật, KHÔNG giải thích nhập môn. Trả lời tiếng Việt.
+KHÔNG dùng Lombok (cố ý — code tường minh). Comment trong code viết không dấu; tài liệu có dấu.
 
 ## Stack
-- Java 21, Spring Boot 4.1.0 (Maven, dùng `mvnw`)
-- Spring Web (MVC), Spring Data JPA, Bean Validation
-- DB: H2 in-memory (mặc định) — có sẵn driver PostgreSQL để chuyển sau
-- KHÔNG dùng Lombok (cố ý — để code tường minh cho người học)
+- Java 21, Spring Boot 4.1.0 (Maven, `mvnw`)
+- Spring Web MVC, Data JPA, Bean Validation, Spring Security 7 (JWT **RS256**)
+- **PostgreSQL only** (Flyway sở hữu schema, `ddl-auto=validate`). **Redis** cho state phân tán.
+- Observability: Actuator + Prometheus + Micrometer Tracing (OTLP). jjwt 0.12.x, springdoc 2.8.x.
 
 ## Chạy / build (PowerShell, Windows)
 ```powershell
 $env:JAVA_HOME = (Get-ChildItem 'C:\Program Files\Eclipse Adoptium' -Directory | ? { $_.Name -like 'jdk-21*' } | Select -First 1).FullName
-.\mvnw.cmd spring-boot:run     # chạy app tại http://localhost:8080
-.\mvnw.cmd test                # chạy test
-.\mvnw.cmd -q -B compile       # chỉ biên dịch
+docker compose up -d db redis     # Postgres + Redis cho dev
+.\mvnw.cmd spring-boot:run         # app tai http://localhost:8080 (default = Postgres + Redis localhost)
+.\mvnw.cmd verify                  # test (unit + ArchUnit) + Checkstyle + Enforcer + JaCoCo report
+.\mvnw.cmd -Pci verify             # CI: them OWASP + SpotBugs + coverage gate (cham, can NVD key)
+docker compose up --build          # chay full app+db+redis trong container
 ```
-JDK 21 cài qua winget (EclipseAdoptium.Temurin.21.JDK), JAVA_HOME chưa set sẵn ở PATH nên luôn set thủ công như trên.
+Profile `prod` (`--spring.profiles.active=prod`): Secure cookie, structured JSON log, ẩn lỗi, forward-headers.
 
 ## Kiến trúc
-Luồng: `controller → service → repository → entity (DB)`. DTO (`dto/`) tách entity khỏi API.
-Lỗi xử lý tập trung ở `exception/GlobalExceptionHandler` (400/401/404). Dữ liệu mẫu nạp ở
-`config/DataSeeder` mỗi lần khởi động (chỉ ở profile != postgres).
+Luồng: `controller → service → repository → entity (DB)`. DTO tách entity khỏi API. Lỗi tập trung ở
+`exception/GlobalExceptionHandler` theo **RFC 7807 ProblemDetail** (`application/problem+json`).
+Schema + seed do **Flyway** (`db/migration/V1..V5`); KHÔNG còn DataSeeder.
 
-Bảng nghiệp vụ: `Category 1─* Product`, `Order *─1 Customer`, `Order 1─* OrderItem *─1 Product`.
-Bảng Order map tên `orders` (ORDER là từ khoá SQL). Tiền dùng `BigDecimal`.
+Bảng nghiệp vụ: `Category 1─* Product`, `Order *─1 Customer`, `Order 1─* OrderItem *─1 Product`,
+`Cart 1─* CartItem`, `Review`, RBAC (`User *─* Role *─* Permission`), `RefreshToken`, `LoginEvent`.
+Bảng Order map `orders`. Tiền `BigDecimal`. `Product` + `Order` có `@Version` (optimistic lock).
 
-### Bảo mật & phân quyền (RBAC + JWT)
-- `package security/`: `JwtService` (tạo/verify JWT), `JwtAuthenticationFilter` (đọc Bearer token mỗi
-  request), `SecurityConfig` (filter chain stateless, `@EnableMethodSecurity`, BCrypt), `SecurityUtils`,
-  handler trả JSON 401 (`RestAuthEntryPoint`) / 403 (`RestAccessDeniedHandler`).
-- Mô hình: `User *─* Role *─* Permission`. 3 role: ADMIN/STAFF/CUSTOMER. Authority nạp lúc đăng nhập =
-  `ROLE_<ten>` + tên permission. Chặn endpoint bằng `@PreAuthorize("hasAnyRole('STAFF','ADMIN')")` trên
-  controller/method (KHÔNG cấu hình URL-based trừ vài endpoint public trong SecurityConfig).
-- `Customer.user` (One-to-One) gắn tài khoản với hồ sơ khách. `OrderService` lấy Customer từ user đăng
-  nhập (CUSTOMER không tự truyền `customerId`); CUSTOMER chỉ xem/đặt đơn của chính mình.
+### Bảo mật & phân quyền (RBAC + JWT RS256)
+- `security/`: `JwtService` (RS256: ký bằng private key, verify public key — khoá dev ở `keys/*.pem`,
+  prod override `APP_JWT_PRIVATE_KEY/PUBLIC_KEY`), `JwtAuthenticationFilter` (nạp lại user từ DB mỗi
+  request → khoá/đổi quyền hiệu lực ngay), `SecurityConfig` (stateless, method security, headers HSTS/
+  nosniff/frame-deny/referrer/permissions, CORS), handler 401/403.
+- 3 role ADMIN/STAFF/CUSTOMER; chặn bằng `@PreAuthorize`. Refresh token httpOnly cookie
+  (`RefreshTokenCookie`), lưu **băm SHA-256** ở DB, **xoay vòng** + phát hiện tái sử dụng.
+- **Redis (multi-instance)**: rate-limit (`RateLimitFilter`, Lua INCR), login-attempts
+  (`LoginAttemptService`), cache (categories `@Cacheable` + UserDetails). KHÔNG còn state in-memory.
+- `Customer.user` (1-1) gắn tài khoản ↔ hồ sơ khách; CUSTOMER chỉ thao tác dữ liệu của mình.
 
-### Hardening đã áp dụng (lưu ý khi sửa)
-- **Secret JWT** đọc từ env `APP_JWT_SECRET` (`application.properties` chỉ có fallback dev). JWT có
-  `issuer=shop-api` và được `requireIssuer` khi verify.
-- **JwtAuthenticationFilter nạp lại user từ DB mỗi request** (qua `UserDetailsService`) để đổi quyền/khoá
-  user có hiệu lực ngay; vì vậy KHÔNG còn tin authorities trong token. `/api/auth/me` KHÔNG nằm trong
-  permitAll (chỉ register/login/refresh/logout public) để user bị khoá nhận 401 rõ ràng.
-- **RefreshToken** lưu **băm SHA-256** (không lưu token gốc), **xoay vòng** mỗi lần refresh; phát hiện tái
-  sử dụng → thu hồi toàn bộ. Việc thu hồi đó dùng `REQUIRES_NEW` (`RefreshTokenService.revokeAllForUser`)
-  để COMMIT độc lập trước khi ném 401 — đừng gộp lại vào transaction của `AuthService.refresh`.
-- **LoginAttemptService**: khoá đăng nhập sau N lần sai (`429`). **Register** trả thông báo chung chung
-  (chống user enumeration). **Mật khẩu** ≥ 8 ký tự + có chữ và số (`RegisterRequest`).
-- **CORS** cấu hình qua `app.cors.allowed-origins`. **H2 console** chỉ permit khi
-  `spring.h2.console.enabled=true`.
-- Production: chạy sau HTTPS/TLS (ngoài phạm vi code).
+### Nền tảng & tính năng
+- **Audit** (`common/Auditable` + `JpaAuditingConfig`), **soft delete** (`Product` `@SQLDelete`/`@SQLRestriction`),
+  **phân trang/lọc** (`PageResponse`, `ProductSpecifications`), **idempotency** (`IdempotencyService` +
+  header `Idempotency-Key` cho tạo đơn/checkout), **access log** (`RequestLoggingFilter`).
+- Nghiệp vụ: Category CRUD, Cart + checkout, Review, đổi mật khẩu, pay mock, logout-all.
+- Data: report `revenue-by-category|-by-month|top-customers` (**Postgres `to_char`**), CSV, `@Scheduled`.
 
-### Tính năng nền (common/)
-- **Audit**: entity nghiệp vụ kế thừa `common/Auditable` (`@CreatedDate/@CreatedBy...`), bật bởi
-  `config/JpaAuditingConfig` + `AuditorAwareImpl` (lấy username từ SecurityContext, mặc định "system").
-- **Soft delete**: `Product` dùng `@SQLDelete` + `@SQLRestriction("deleted = false")` — DELETE chỉ set
-  `deleted=true`, query mặc định tự ẩn.
-- **Phân trang/lọc**: list trả `dto/PageResponse<T>`; lọc sản phẩm động bằng `ProductSpecifications`
-  (JpaSpecificationExecutor).
-- **Request logging**: `common/RequestLoggingFilter` log method/path/status/thời gian + correlationId (MDC).
-- **Swagger**: `config/OpenApiConfig` khai báo security scheme Bearer; UI tại `/swagger-ui.html`.
+### Lưu ý kỹ thuật Spring Boot 4.1 (autoconfig tách module — dễ vấp)
+- **Flyway** cần `spring-boot-flyway`; **Tracing** cần `spring-boot-micrometer-tracing` +
+  `spring-boot-opentelemetry` (chỉ thư viện micrometer/otel là KHÔNG đủ — autoconfig không chạy).
+- Boot 4 dùng **Jackson 3** cho HTTP → không có bean `ObjectMapper` (Jackson 2) để inject (handler tự new).
+  Redis JSON serializer (Jackson 2) cần `jackson-datatype-jsr310` + `JavaTimeModule` (xem `RedisConfig`)
+  để serialize `LocalDateTime`.
+- Transaction: thao tác "phải commit dù caller ném lỗi" (thu hồi token khi reuse, ghi LoginEvent khi login
+  fail) dùng `@Transactional(REQUIRES_NEW)` ở bean riêng — đừng gộp vào tx của caller.
 
-### Tính năng mở rộng (Nhóm 2-5)
-- Nghiệp vụ: `Category` CRUD; `Cart`/`CartItem` + checkout (tái dùng `OrderService.createOrder`);
-  `Review` (rating+comment, điểm trung bình); `POST /api/auth/change-password`; `POST /api/orders/{id}/pay`
-  (MOCK thanh toán → PAID).
-- DevOps: `Dockerfile` + `docker-compose.yml` (app+Postgres); `.github/workflows/ci.yml` (mvnw verify);
-  cache Caffeine cho danh mục (`@Cacheable`/`@CacheEvict`, bật bằng `@EnableCaching`);
-  metrics `/actuator/prometheus` (ADMIN); lỗi theo **RFC 7807 ProblemDetail** (`application/problem+json`).
-- Data: báo cáo `revenue-by-category`/`-by-month`/`top-customers` (native SQL, H2-specific),
-  xuất CSV `best-sellers/csv`, job `@Scheduled` (`config/ReportScheduler`, bật bằng `@EnableScheduling`).
-- Bảo mật: `LoginEvent` lưu DB (audit đăng nhập, `LoginEventService.record` dùng `REQUIRES_NEW` để
-  commit độc lập); security headers (HSTS/nosniff/frame). Email-verify & MFA: HOÃN (cần dịch vụ ngoài).
-- Lưu ý transaction: các thao tác "phải commit dù caller ném lỗi" (thu hồi token khi reuse, ghi LoginEvent
-  khi login thất bại) đều dùng `@Transactional(REQUIRES_NEW)` ở bean riêng — đừng gộp vào tx của caller.
+### Guardrail tự động (xem `docs/CONVENTIONS.md`)
+- **ArchUnit** ép phân tầng (mvnw test). **Checkstyle** cảnh báo (không fail). **Maven Enforcer** (Java≥21).
+- **Testcontainers** (Postgres+Redis) cho integration test — chạy ở CI (Linux); local Windows có thể skip
+  nếu Docker Desktop không kết nối được qua npipe (`disabledWithoutDocker`).
+- **JaCoCo** report (build) + gate ở `-Pci`. **OWASP/SpotBugs** ở `-Pci` (report-only).
 
-### Lưu ý kỹ thuật (Spring Boot 4.1)
-- Boot 4 dùng Jackson 3 cho HTTP → KHÔNG có bean `com.fasterxml.jackson.databind.ObjectMapper` (Jackson 2)
-  để inject. Các handler tự `new ObjectMapper()`.
-- jjwt 0.12.x, springdoc 2.8.x, Spring Security 7. Mật khẩu seed lưu BCrypt.
-
-## Quy ước
-- Tiền: luôn `BigDecimal`, không dùng double.
-- Báo cáo doanh thu loại đơn `CANCELLED`.
-- Mapping Entity→DTO nằm trong method `@Transactional` (vì `open-in-view=false`).
-- Comment trong code viết không dấu (tránh lỗi encoding), nhưng trả lời người dùng thì có dấu.
-
-### Rule/Guardrail tự động (xem `docs/CONVENTIONS.md`)
-- **ArchUnit** (`src/test/.../architecture/ArchitectureTest.java`): ép phân tầng (controller không gọi
-  thẳng repository, entity không phụ thuộc tầng trên, không field injection, naming). Chạy với `mvnw test`.
-- **Checkstyle** (`config/checkstyle/checkstyle.xml`): cảnh báo style khi `mvnw verify` (KHÔNG fail build).
-- **Maven Enforcer**: Java ≥ 21, Maven ≥ 3.9, cấm trùng dependency.
-- **Actuator**: `/actuator/health` công khai; actuator khác yêu cầu ADMIN.
-- Secret qua env `APP_JWT_SECRET` (`.env.example`); `.env` đã được .gitignore.
-- Khi thêm code mới: giữ đúng các rule trên (nếu ArchUnit/Checkstyle phàn nàn, sửa cho đúng quy ước).
-
-## Khi người dùng nhờ "làm bài tập #N"
-Xem danh sách ở `README.md` mục 5. Hướng dẫn từng bước, để họ tự gõ; chỉ viết hộ phần khó.
+## Còn lại / caveat
+- **API versioning `/api/v1`**: HOÃN — là breaking change cần đồng bộ với frontend `shop-client`; làm phối hợp.
+- **Tracing traceId trên access-log**: span tạo ở scope DispatcherServlet nên dòng access-log (servlet filter,
+  ngoài scope) có thể trống traceId; log controller/service vẫn có; span xuất OTLP khi set endpoint collector.
+- Email-verify/MFA: ngoài phạm vi (cần SMTP/dịch vụ ngoài).

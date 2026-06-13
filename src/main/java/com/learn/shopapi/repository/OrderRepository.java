@@ -42,17 +42,17 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<ProductSalesView> findBestSellingProducts();
 
     /**
-     * BAO CAO 2: Doanh thu theo ngay.
-     * FORMATDATETIME la ham cua H2 de cat lay phan ngay (yyyy-MM-dd).
+     * BAO CAO 2: Doanh thu theo ngay (Postgres: to_char cat phan ngay yyyy-MM-dd).
+     * DAY/MONTH la tu khoa reserved -> quote alias "day".
      */
     @Query(value = """
-            SELECT FORMATDATETIME(o.order_date, 'yyyy-MM-dd') AS day,
+            SELECT to_char(o.order_date, 'YYYY-MM-DD') AS "day",
                    COUNT(o.id)            AS orderCount,
                    SUM(o.total_amount)    AS revenue
             FROM orders o
             WHERE o.status <> 'CANCELLED'
-            GROUP BY FORMATDATETIME(o.order_date, 'yyyy-MM-dd')
-            ORDER BY day
+            GROUP BY to_char(o.order_date, 'YYYY-MM-DD')
+            ORDER BY "day"
             """, nativeQuery = true)
     List<DailyRevenueView> findDailyRevenue();
 
@@ -78,15 +78,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             """, nativeQuery = true)
     List<CategoryRevenueView> findRevenueByCategory();
 
-    /** BAO CAO: doanh thu theo THANG (yyyy-MM). FORMATDATETIME la ham cua H2. */
+    /**
+     * BAO CAO: doanh thu theo THANG (Postgres: to_char ...'YYYY-MM').
+     * MONTH la tu khoa reserved -> quote alias "month".
+     */
     @Query(value = """
-            SELECT FORMATDATETIME(o.order_date, 'yyyy-MM') AS month,
+            SELECT to_char(o.order_date, 'YYYY-MM') AS "month",
                    COUNT(o.id)         AS orderCount,
                    SUM(o.total_amount) AS revenue
             FROM orders o
             WHERE o.status <> 'CANCELLED'
-            GROUP BY FORMATDATETIME(o.order_date, 'yyyy-MM')
-            ORDER BY month
+            GROUP BY to_char(o.order_date, 'YYYY-MM')
+            ORDER BY "month"
             """, nativeQuery = true)
     List<MonthlyRevenueView> findRevenueByMonth();
 

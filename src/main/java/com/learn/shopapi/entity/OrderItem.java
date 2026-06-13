@@ -8,7 +8,10 @@ import java.math.BigDecimal;
  * Luu lai unitPrice tai THOI DIEM mua, vi gia san pham co the doi sau nay.
  */
 @Entity
-@Table(name = "order_items")
+@Table(name = "order_items", indexes = {
+        @Index(name = "idx_order_items_order", columnList = "order_id"),
+        @Index(name = "idx_order_items_product", columnList = "product_id")
+})
 public class OrderItem {
 
     @Id

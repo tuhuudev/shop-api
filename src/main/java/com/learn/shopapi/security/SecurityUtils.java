@@ -25,11 +25,15 @@ public final class SecurityUtils {
     /** True neu nguoi dang dang nhap co it nhat 1 trong cac vai tro truyen vao (vd "STAFF","ADMIN"). */
     public static boolean hasAnyRole(String... roles) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) return false;
+        if (auth == null) {
+            return false;
+        }
         for (String role : roles) {
             String authority = "ROLE_" + role;
             for (GrantedAuthority ga : auth.getAuthorities()) {
-                if (authority.equals(ga.getAuthority())) return true;
+                if (authority.equals(ga.getAuthority())) {
+                    return true;
+                }
             }
         }
         return false;

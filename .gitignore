@@ -8,6 +8,8 @@ target/
 .env
 *.env
 !.env.example
+# Khoa RS256 dev - moi may tu sinh, prod override qua env APP_JWT_*
+src/main/resources/keys/*.pem
 
 ### STS ###
 .apt_generated

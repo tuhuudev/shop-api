@@ -19,7 +19,7 @@ import java.math.BigDecimal;
  *   nen san pham da "xoa mem" se khong con xuat hien. Du lieu van con trong DB de truy vet.
  */
 @Entity
-@Table(name = "products")
+@Table(name = "products", indexes = @Index(name = "idx_products_category", columnList = "category_id"))
 @SQLDelete(sql = "UPDATE products SET deleted = true WHERE id = ?")
 @SQLRestriction("deleted = false")
 public class Product extends Auditable {

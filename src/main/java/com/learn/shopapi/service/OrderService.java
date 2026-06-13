@@ -140,7 +140,9 @@ public class OrderService {
 
     /** CUSTOMER chi duoc xem don cua chinh minh; STAFF/ADMIN xem tat ca. */
     private void ensureCanView(Order order) {
-        if (SecurityUtils.hasAnyRole("STAFF", "ADMIN")) return;
+        if (SecurityUtils.hasAnyRole("STAFF", "ADMIN")) {
+            return;
+        }
         String username = currentUsername();
         User owner = order.getCustomer().getUser();
         if (owner == null || !username.equals(owner.getUsername())) {

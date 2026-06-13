@@ -8,7 +8,7 @@ import java.time.Instant;
  * dieu tra su co, phat hien tan cong do mat khau. Luu DB (khac voi LoginAttemptService chi dem trong RAM).
  */
 @Entity
-@Table(name = "login_events")
+@Table(name = "login_events", indexes = @Index(name = "idx_login_events_at", columnList = "at"))
 public class LoginEvent {
 
     @Id

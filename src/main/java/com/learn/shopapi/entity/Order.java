@@ -16,7 +16,10 @@ import java.util.List;
  * - Ke thua Auditable: tu co created_at/created_by (ai tao don, luc nao).
  */
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", indexes = {
+        @Index(name = "idx_orders_customer", columnList = "customer_id"),
+        @Index(name = "idx_orders_order_date", columnList = "order_date")
+})
 public class Order extends Auditable {
 
     @Id
@@ -41,6 +44,10 @@ public class Order extends Auditable {
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    // Optimistic locking: chong 2 thao tac doi trang thai don dong thoi ghi de nhau.
+    @Version
+    private Long version;
 
     protected Order() { }
 
@@ -70,4 +77,5 @@ public class Order extends Auditable {
     public void setStatus(OrderStatus status) { this.status = status; }
     public List<OrderItem> getItems() { return items; }
     public BigDecimal getTotalAmount() { return totalAmount; }
+    public Long getVersion() { return version; }
 }

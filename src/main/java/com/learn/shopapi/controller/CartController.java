@@ -23,9 +23,12 @@ import org.springframework.web.bind.annotation.*;
 public class CartController {
 
     private final CartService cartService;
+    private final com.learn.shopapi.service.IdempotencyService idempotencyService;
 
-    public CartController(CartService cartService) {
+    public CartController(CartService cartService,
+                          com.learn.shopapi.service.IdempotencyService idempotencyService) {
         this.cartService = cartService;
+        this.idempotencyService = idempotencyService;
     }
 
     @GetMapping
@@ -54,8 +57,9 @@ public class CartController {
 
     @PostMapping("/checkout")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Dat hang tu gio (tru kho, tao don, xoa rong gio)")
-    public OrderResponse checkout() {
-        return cartService.checkout();
+    @Operation(summary = "Dat hang tu gio (ho tro Idempotency-Key de retry an toan)")
+    public OrderResponse checkout(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return idempotencyService.execute(idempotencyKey, cartService::checkout);
     }
 }

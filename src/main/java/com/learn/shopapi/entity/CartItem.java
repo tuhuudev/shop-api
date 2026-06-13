@@ -4,7 +4,10 @@ import jakarta.persistence.*;
 
 /** Mot dong trong gio hang: 1 san pham + so luong. */
 @Entity
-@Table(name = "cart_items")
+@Table(name = "cart_items", indexes = {
+        @Index(name = "idx_cart_items_cart", columnList = "cart_id"),
+        @Index(name = "idx_cart_items_product", columnList = "product_id")
+})
 public class CartItem {
 
     @Id

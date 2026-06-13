@@ -32,12 +32,23 @@
 		<jjwt.version>0.12.6</jjwt.version>
 		<!-- springdoc: tu sinh trang Swagger UI tu cac controller. -->
 		<springdoc.version>2.8.6</springdoc.version>
+		<testcontainers.version>1.21.3</testcontainers.version>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<!-- Boot 4.1 khong quan ly version Testcontainers -> import BOM de dong bo. -->
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>${testcontainers.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-h2console</artifactId>
-		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -82,6 +93,12 @@
 		</dependency>
 
 		<!-- ============ DB MIGRATION: Flyway (dung o profile postgres) ============ -->
+		<!-- Spring Boot 4 tach autoconfiguration ra module rieng: can spring-boot-flyway
+		     thi FlywayAutoConfiguration moi kich hoat (chi flyway-core la KHONG du). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-flyway</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-core</artifactId>
@@ -101,22 +118,44 @@
 			<artifactId>micrometer-registry-prometheus</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Distributed tracing: sinh traceId/spanId (correlate log) + xuat span qua OTLP.
+		     Boot 4 tach autoconfig ra module rieng -> can spring-boot-micrometer-tracing +
+		     spring-boot-opentelemetry thi tracing moi kich hoat (giong truong hop Flyway). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-micrometer-tracing</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-opentelemetry</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-tracing-bridge-otel</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.opentelemetry</groupId>
+			<artifactId>opentelemetry-exporter-otlp</artifactId>
+		</dependency>
 
-		<!-- ============ CACHING: Spring Cache + Caffeine (cho danh muc it doi) ============ -->
+		<!-- ============ CACHE + STATE PHAN TAN: Spring Cache + Redis (multi-instance) ============ -->
+		<!-- Redis giu state DUNG CHIA SE giua cac replica: rate-limit, login-attempts, cache. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-cache</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.github.ben-manes.caffeine</groupId>
-			<artifactId>caffeine</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		<!-- Jackson 2 + JSR310: de serializer JSON cua Redis (spring-data-redis dung Jackson 2)
+		     xu ly duoc LocalDateTime/Instant trong DTO cache/idempotency. -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+			<version>2.21.4</version>
 		</dependency>
 
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
-		</dependency>
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
@@ -149,6 +188,22 @@
 			<version>1.3.0</version>
 			<scope>test</scope>
 		</dependency>
+		<!-- Testcontainers: integration test chay tren Postgres THAT (khong dung H2) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -156,6 +211,29 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+
+			<!-- JaCoCo: do coverage. prepare-agent + report chay moi build (sinh bao cao);
+			     cong CHECK (nguong) o profile "ci" (vi integration test can Docker - chay tren CI). -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.13</version>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 
 			<!-- Enforcer: ep cac dieu kien build (phien ban Java/Maven, khong trung dependency). -->
@@ -215,5 +293,100 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<!-- Profile "ci": quet sau (coverage gate + CVE + bao mat tinh). Chay tren CI:
+		     mvnw -Pci verify. Tach khoi build mac dinh de `verify` local nhanh.
+		     Cac scan dat REPORT-ONLY (khong fail) ban dau - siet dan khi on dinh. -->
+		<profile>
+			<id>ci</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.jacoco</groupId>
+						<artifactId>jacoco-maven-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>coverage-check</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>check</goal>
+								</goals>
+								<configuration>
+									<haltOnFailure>false</haltOnFailure>
+									<rules>
+										<rule>
+											<element>BUNDLE</element>
+											<excludes>
+												<exclude>com.learn.shopapi.dto.*</exclude>
+												<exclude>com.learn.shopapi.entity.*</exclude>
+												<exclude>com.learn.shopapi.config.*</exclude>
+											</excludes>
+											<limits>
+												<limit>
+													<counter>LINE</counter>
+													<value>COVEREDRATIO</value>
+													<minimum>0.50</minimum>
+												</limit>
+											</limits>
+										</rule>
+									</rules>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+
+					<!-- OWASP Dependency-Check: quet CVE thu vien. failBuildOnCVSS=11 = chi bao cao
+					     (ha xuong 7-8 de chan high/critical). NVD nhanh hon neu truyen -DnvdApiKey=... -->
+					<plugin>
+						<groupId>org.owasp</groupId>
+						<artifactId>dependency-check-maven</artifactId>
+						<version>10.0.4</version>
+						<configuration>
+							<failBuildOnCVSS>11</failBuildOnCVSS>
+							<formats>
+								<format>HTML</format>
+								<format>JSON</format>
+							</formats>
+						</configuration>
+						<executions>
+							<execution>
+								<goals>
+									<goal>check</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+
+					<!-- SpotBugs + find-sec-bugs: phan tich tinh, tap trung bao mat (bao cao). -->
+					<plugin>
+						<groupId>com.github.spotbugs</groupId>
+						<artifactId>spotbugs-maven-plugin</artifactId>
+						<version>4.8.6.4</version>
+						<configuration>
+							<effort>Max</effort>
+							<threshold>Medium</threshold>
+							<failOnError>false</failOnError>
+							<includeFilterFile/>
+							<plugins>
+								<plugin>
+									<groupId>com.h3xstream.findsecbugs</groupId>
+									<artifactId>findsecbugs-plugin</artifactId>
+									<version>1.13.0</version>
+								</plugin>
+							</plugins>
+						</configuration>
+						<executions>
+							<execution>
+								<goals>
+									<goal>check</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 </project>

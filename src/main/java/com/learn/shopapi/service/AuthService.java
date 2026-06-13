@@ -149,6 +149,16 @@ public class AuthService {
         refreshTokenService.revoke(refreshToken);
     }
 
+    /** Dang xuat khoi TAT CA thiet bi: thu hoi het refresh token cua user dang dang nhap. */
+    @Transactional
+    public void logoutAll() {
+        String username = SecurityUtils.getCurrentUsername()
+                .orElseThrow(() -> new ResourceNotFoundException("Chua dang nhap"));
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay user: " + username));
+        refreshTokenService.revokeAllForUser(user);
+    }
+
     @Transactional
     public void changePassword(String oldPassword, String newPassword) {
         String username = SecurityUtils.getCurrentUsername()

@@ -11,7 +11,7 @@ import java.time.Instant;
  * Luu trong DB de co the THU HOI (revoke) khi logout hoac nghi ngo lo token.
  */
 @Entity
-@Table(name = "refresh_tokens")
+@Table(name = "refresh_tokens", indexes = @Index(name = "idx_refresh_tokens_user", columnList = "user_id"))
 public class RefreshToken {
 
     @Id

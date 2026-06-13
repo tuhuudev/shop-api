@@ -22,7 +22,8 @@
         <!-- Import sach -->
         <module name="UnusedImports"/>
         <module name="RedundantImport"/>
-        <module name="AvoidStarImport"/>
+        <!-- KHONG bat AvoidStarImport: du an co y dung dang '.*' cho cac package annotation
+             (jakarta.persistence.*, ...web.bind.annotation.*) de import gon. Day la quy uoc co san. -->
 
         <!-- Luon dung ngoac { } cho if/for/while... (tranh loi an) -->
         <module name="NeedBraces"/>

@@ -1,25 +1,25 @@
-# shop-api — Học Backend & Data qua quản lý đơn hàng
+# shop-api — API bán hàng (Spring Boot 4, production-grade)
 
-Project Spring Boot (Java 21) mô phỏng hệ thống bán hàng đơn giản, được thiết kế để **vừa code vừa học** Backend và Data từ con số 0.
+API bán hàng có **JWT RS256 + RBAC**, **PostgreSQL + Flyway**, **Redis** (cache/rate-limit/login-attempts
+phân tán cho multi-instance), observability (Prometheus + tracing), idempotency, Docker + CI.
 
 ---
 
-## 1. Chạy thử trong 30 giây
+## 1. Chạy thử
 
-Mở terminal **PowerShell** ngay tại thư mục này:
+Cần **Docker** (cho Postgres + Redis). Mở **PowerShell** tại thư mục này:
 
 ```powershell
 $env:JAVA_HOME = (Get-ChildItem 'C:\Program Files\Eclipse Adoptium' -Directory | ? { $_.Name -like 'jdk-21*' } | Select -First 1).FullName
-.\mvnw.cmd spring-boot:run
+docker compose up -d db redis      # khoi dong Postgres + Redis
+.\mvnw.cmd spring-boot:run          # app tai http://localhost:8080
 ```
+Hoặc chạy trọn gói trong container: `docker compose up --build`.
 
-Khi thấy dòng `DU LIEU MAU DA NAP XONG!` là app đã chạy ở `http://localhost:8080`.
-
-Mở trình duyệt thử ngay:
-- Danh sách sản phẩm (công khai): http://localhost:8080/api/products
-- **Swagger UI** (thử mọi API, có nút Authorize): http://localhost:8080/swagger-ui.html
-- Xem database trực tiếp: http://localhost:8080/h2-console
-  (JDBC URL gõ đúng: `jdbc:h2:mem:shopdb`, user `sa`, password để trống → Connect)
+Flyway tự tạo schema + seed (V1..V5). Mở:
+- Sản phẩm (công khai): http://localhost:8080/api/products
+- **Swagger UI** (có nút Authorize): http://localhost:8080/swagger-ui.html
+- Health: http://localhost:8080/actuator/health
 
 **Tài khoản mẫu** (đăng nhập qua `POST /api/auth/login`):
 

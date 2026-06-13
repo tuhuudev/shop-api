@@ -1,5 +1,6 @@
 package com.learn.shopapi.service;
 
+import com.learn.shopapi.AbstractIntegrationTest;
 import com.learn.shopapi.dto.OrderRequest;
 import com.learn.shopapi.entity.Product;
 import com.learn.shopapi.repository.ProductRepository;
@@ -27,14 +28,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ca 2 cung tru -> ban am. @Version khien commit sau that bai (OptimisticLockException).
  */
 @SpringBootTest
-class OrderConcurrencyTest {
+class OrderConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired private OrderService orderService;
     @Autowired private ProductRepository productRepository;
 
     @Test
     void haiDonDongThoi_chiMotThanhCong_khoKhongAm() throws Exception {
-        // San pham chi con 1 trong kho (tai khoan "customer" da gan voi Customer "an" tu DataSeeder).
+        // San pham chi con 1 trong kho (tai khoan "customer" da gan voi Customer "an" tu Flyway seed V2).
         Product p = productRepository.save(
                 new Product("Hang hiem", "chi con 1", new BigDecimal("1000"), 1, null));
         Long productId = p.getId();

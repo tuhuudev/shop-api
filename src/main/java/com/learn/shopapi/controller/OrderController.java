@@ -26,9 +26,12 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
+    private final com.learn.shopapi.service.IdempotencyService idempotencyService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService,
+                           com.learn.shopapi.service.IdempotencyService idempotencyService) {
         this.orderService = orderService;
+        this.idempotencyService = idempotencyService;
     }
 
     @GetMapping
@@ -48,9 +51,10 @@ public class OrderController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Tao don. CUSTOMER dat cho minh; STAFF/ADMIN co the dat ho qua customerId")
-    public OrderResponse create(@Valid @RequestBody OrderRequest request) {
-        return orderService.createOrder(request);
+    @Operation(summary = "Tao don (ho tro header Idempotency-Key de retry an toan, khong tao trung)")
+    public OrderResponse create(@Valid @RequestBody OrderRequest request,
+                                @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return idempotencyService.execute(idempotencyKey, () -> orderService.createOrder(request));
     }
 
     @PostMapping("/{id}/pay")
