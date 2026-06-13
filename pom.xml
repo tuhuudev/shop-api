@@ -32,6 +32,9 @@
 		<jjwt.version>0.12.6</jjwt.version>
 		<!-- springdoc: tu sinh trang Swagger UI tu cac controller. -->
 		<springdoc.version>2.8.6</springdoc.version>
+		<!-- Ghi de swagger-ui webjar: springdoc 2.8.6 keo 5.20.1 (DOMPurify dinh CVE).
+		     Nang len ban vUI moi nhat (DOMPurify da va) - xem OWASP report. -->
+		<swagger-ui.version>5.25.3</swagger-ui.version>
 		<testcontainers.version>1.21.3</testcontainers.version>
 	</properties>
 
@@ -44,6 +47,12 @@
 				<version>${testcontainers.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
+			</dependency>
+			<!-- Ghim swagger-ui webjar moi (va CVE DOMPurify), ghi de ban transitive cua springdoc. -->
+			<dependency>
+				<groupId>org.webjars</groupId>
+				<artifactId>swagger-ui</artifactId>
+				<version>${swagger-ui.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
