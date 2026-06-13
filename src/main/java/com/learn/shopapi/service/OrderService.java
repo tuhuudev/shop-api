@@ -6,6 +6,7 @@ import com.learn.shopapi.dto.PageResponse;
 import com.learn.shopapi.entity.*;
 import com.learn.shopapi.exception.ResourceNotFoundException;
 import com.learn.shopapi.repository.CustomerRepository;
+import com.learn.shopapi.repository.InventoryMovementRepository;
 import com.learn.shopapi.repository.OrderRepository;
 import com.learn.shopapi.repository.ProductRepository;
 import com.learn.shopapi.security.SecurityUtils;
@@ -21,13 +22,16 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
+    private final InventoryMovementRepository inventoryMovementRepository;
 
     public OrderService(OrderRepository orderRepository,
                         CustomerRepository customerRepository,
-                        ProductRepository productRepository) {
+                        ProductRepository productRepository,
+                        InventoryMovementRepository inventoryMovementRepository) {
         this.orderRepository = orderRepository;
         this.customerRepository = customerRepository;
         this.productRepository = productRepository;
+        this.inventoryMovementRepository = inventoryMovementRepository;
     }
 
     /**
@@ -56,7 +60,15 @@ public class OrderService {
             order.addItem(new OrderItem(product, line.quantity()));
         }
 
-        return OrderResponse.from(orderRepository.save(order));
+        Order saved = orderRepository.save(order);
+        // Ghi nhat ky xuat kho (ORDER_OUT) sau khi co order id.
+        String actor = SecurityUtils.getCurrentUsername().orElse("system");
+        for (OrderItem item : saved.getItems()) {
+            inventoryMovementRepository.save(new InventoryMovement(
+                    item.getProduct().getId(), -item.getQuantity(),
+                    InventoryMovementReason.ORDER_OUT, saved.getId(), actor));
+        }
+        return OrderResponse.from(saved);
     }
 
     /**
@@ -136,10 +148,14 @@ public class OrderService {
         return true;
     }
 
-    /** Cong tra so luong cua tung dong hang ve ton kho (khi huy don) - ATOMIC tai DB. */
+    /** Cong tra so luong cua tung dong hang ve ton kho (khi huy/hoan don) - ATOMIC tai DB + ghi nhat ky. */
     private void restock(Order order) {
+        String actor = SecurityUtils.getCurrentUsername().orElse("system");
         for (OrderItem item : order.getItems()) {
             productRepository.incrementStock(item.getProduct().getId(), item.getQuantity());
+            inventoryMovementRepository.save(new InventoryMovement(
+                    item.getProduct().getId(), item.getQuantity(),
+                    InventoryMovementReason.RESTOCK, order.getId(), actor));
         }
     }
 
