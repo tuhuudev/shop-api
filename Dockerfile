@@ -18,8 +18,9 @@ RUN apt-get update \
 COPY --from=build /app/target/*.jar app.jar
 USER appuser
 EXPOSE 8080
-# Healthcheck: container "healthy" khi /actuator/health tra status UP.
+# Healthcheck: container "healthy" khi /actuator/health tra status UP. Dung ${PORT:-8080}
+# de khop ca docker compose (8080) lan PaaS inject PORT (vd Render).
 HEALTHCHECK --interval=15s --timeout=3s --start-period=45s --retries=3 \
-    CMD curl -fsS http://localhost:8080/actuator/health | grep -q '"status":"UP"' || exit 1
+    CMD curl -fsS http://localhost:${PORT:-8080}/actuator/health | grep -q '"status":"UP"' || exit 1
 # MaxRAMPercentage: JVM ton trong gioi han RAM cua container (k8s limits).
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]

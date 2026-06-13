@@ -1,0 +1,55 @@
+# ============================================================
+# Render Blueprint - host shop-api free (Docker) + auto-deploy khi push main.
+# Postgres dung Neon (free), Redis dung Upstash (free) - khai bao connection string qua env.
+# Tao service: Render Dashboard -> New -> Blueprint -> tro toi repo nay.
+# Chi tiet tung buoc: docs/DEPLOY.md
+# ============================================================
+services:
+  - type: web
+    name: shop-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore            # gan VN nhat trong cac region free
+    branch: main
+    autoDeploy: true             # push main -> Render tu build + deploy (CD)
+    # Liveness: chi kiem app con song (khong gom DB/Redis) -> tranh restart khi DB/Redis chop nhoang.
+    healthCheckPath: /actuator/health/liveness
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      # JVM ton trong RAM container 512MB (free).
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=70.0
+
+      # --- PostgreSQL (Neon) - dat trong Dashboard (sync:false). URL phai co ?sslmode=require ---
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+      # --- Redis (Upstash) - bat buoc TLS ---
+      - key: SPRING_DATA_REDIS_HOST
+        sync: false
+      - key: SPRING_DATA_REDIS_PORT
+        sync: false
+      - key: SPRING_DATA_REDIS_PASSWORD
+        sync: false
+      - key: SPRING_DATA_REDIS_SSL_ENABLED
+        value: "true"
+
+      # --- Khoa RS256: tai len qua Render "Secret Files" (xem DEPLOY.md) ---
+      - key: APP_JWT_PRIVATE_KEY
+        value: file:/etc/secrets/jwt-private.pem
+      - key: APP_JWT_PUBLIC_KEY
+        value: file:/etc/secrets/jwt-public.pem
+
+      # --- Secret webhook thanh toan: Render tu sinh ngau nhien (xem o Dashboard de test) ---
+      - key: APP_PAYMENTS_WEBHOOK_SECRET
+        generateValue: true
+
+      # --- CORS: origin that cua frontend (vd https://shop-client.example.com) ---
+      - key: APP_CORS_ALLOWED_ORIGINS
+        sync: false
