@@ -5,6 +5,26 @@ phân tán cho multi-instance), observability (Prometheus + tracing), idempotenc
 
 ---
 
+## 🚀 Live demo
+
+Deploy trên **Render** (app) + **Neon** (PostgreSQL) + **Redis Cloud** — auto-deploy khi push `main`.
+
+- **Swagger UI** (bấm *Authorize* để thử API có token): https://shop-api-ryfm.onrender.com/swagger-ui.html
+- Sản phẩm (công khai): https://shop-api-ryfm.onrender.com/api/products
+- Health: https://shop-api-ryfm.onrender.com/actuator/health
+
+Tài khoản mẫu (qua `POST /api/auth/login`):
+
+| username | password | vai trò |
+|----------|----------|---------|
+| `admin` | `admin123` | ADMIN (toàn quyền) |
+| `staff` | `staff123` | STAFF (sản phẩm, đơn, báo cáo) |
+| `customer` | `customer123` | CUSTOMER (đặt & xem đơn của mình) |
+
+> ⚠️ Free tier **ngủ sau ~15 phút** không truy cập → lần gọi đầu cold-start ~40–60s. Chi tiết deploy: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+---
+
 ## 1. Chạy thử
 
 Cần **Docker** (cho Postgres + Redis). Mở **PowerShell** tại thư mục này:
