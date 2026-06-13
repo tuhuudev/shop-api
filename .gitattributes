@@ -1,2 +1,13 @@
+# Chuan hoa EOL: text mac dinh LF trong repo (het nhiec diff CRLF giua Windows/Linux/CI).
+* text=auto eol=lf
+
 /mvnw text eol=lf
 *.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Nhi phan: khong dung cham EOL.
+*.jar binary
+*.pem binary
+*.png binary
+*.jpg binary
+*.ico binary

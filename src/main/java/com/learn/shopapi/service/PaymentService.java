@@ -6,6 +6,7 @@ import com.learn.shopapi.entity.Payment;
 import com.learn.shopapi.entity.PaymentStatus;
 import com.learn.shopapi.repository.PaymentRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Arrays;
 import java.util.HexFormat;
 
 /**
@@ -29,6 +31,7 @@ import java.util.HexFormat;
 public class PaymentService {
 
     private static final String PROVIDER = "mock";
+    private static final String DEV_SECRET = "dev-webhook-secret";
 
     private final PaymentRepository paymentRepository;
     private final OrderService orderService;
@@ -36,10 +39,18 @@ public class PaymentService {
 
     public PaymentService(PaymentRepository paymentRepository,
                           OrderService orderService,
-                          @Value("${app.payments.webhook-secret:dev-webhook-secret}") String webhookSecret) {
+                          @Value("${app.payments.webhook-secret:" + DEV_SECRET + "}") String webhookSecret,
+                          Environment env) {
         this.paymentRepository = paymentRepository;
         this.orderService = orderService;
         this.webhookSecret = webhookSecret;
+        // FAIL-FAST: o prod KHONG duoc dung secret dev/rong -> nguoi ngoai se gia mao duoc webhook
+        // (ky giao dich gia -> mark don PAID). Bat dat APP_PAYMENTS_WEBHOOK_SECRET that.
+        if (Arrays.asList(env.getActiveProfiles()).contains("prod")
+                && (webhookSecret == null || webhookSecret.isBlank() || DEV_SECRET.equals(webhookSecret))) {
+            throw new IllegalStateException(
+                    "Prod yeu cau APP_PAYMENTS_WEBHOOK_SECRET (khong duoc rong / khong dung secret dev)");
+        }
     }
 
     @Transactional

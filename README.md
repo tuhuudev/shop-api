@@ -187,20 +187,22 @@ không mất. Ở chế độ dev mặc định (H2 in-memory) thì Flyway tắt
 ## 7. Bảo mật đã áp dụng (và giới hạn)
 
 Các lớp bảo vệ đã có trong code (đã kiểm thử end-to-end):
-- Mật khẩu băm **BCrypt**; JWT ký **HS256** có kiểm `issuer`.
+- Mật khẩu băm **BCrypt**; JWT ký **RS256** (private/public key) có kiểm `issuer`.
 - **Phân quyền** RBAC qua `@PreAuthorize` + kiểm chủ sở hữu (CUSTOMER chỉ xem đơn của mình).
 - **Khoá tài khoản có hiệu lực tức thì**: mỗi request nạp lại user từ DB (đổi vai trò/khoá user → áp dụng ngay, không đợi token hết hạn).
-- **Refresh token**: lưu **băm SHA-256** trong DB, **xoay vòng** mỗi lần refresh, **phát hiện tái sử dụng** (token cũ bị dùng lại → thu hồi toàn bộ).
-- **Chống dò mật khẩu**: khoá đăng nhập sau 5 lần sai (`429`). **Chống dò tài khoản**: thông báo đăng ký chung chung.
+- **Refresh token**: httpOnly cookie, lưu **băm SHA-256** trong DB, **xoay vòng** mỗi lần refresh, **phát hiện tái sử dụng** (token cũ bị dùng lại → thu hồi toàn bộ).
+- **Chống dò mật khẩu**: khoá đăng nhập sau 5 lần sai + **rate-limit theo IP qua Redis** (`429`, đa instance). **Chống dò tài khoản**: thông báo đăng ký chung chung.
 - **Mật khẩu mạnh** (≥ 8 ký tự, có cả chữ và số). **CORS** cấu hình qua `app.cors.allowed-origins`.
-- **H2 console** chỉ mở khi `spring.h2.console.enabled=true` (dev), tự đóng ở môi trường thật.
+- **Webhook thanh toán** xác thực bằng **HMAC-SHA256** (so sánh hằng-thời-gian) + idempotency theo `provider_ref`.
 
-Vận hành cho production (KHÔNG để mặc định):
-- Đặt secret qua biến môi trường: `setx APP_JWT_SECRET "<base64 >=32 byte>"` (đừng commit secret).
-- Chạy sau **HTTPS/TLS** (reverse proxy hoặc `server.ssl.*`) để token không bị nghe lén.
-- Bật Postgres + tắt H2 console (profile `postgres` đã làm sẵn).
+Vận hành cho production (profile `prod` — KHÔNG để mặc định):
+- Khoá RS256 thật qua env file-mount: `APP_JWT_PRIVATE_KEY`/`APP_JWT_PUBLIC_KEY` (đừng commit private key).
+- `APP_PAYMENTS_WEBHOOK_SECRET` **bắt buộc** (app fail-fast nếu thiếu/đang là secret dev).
+- `SPRING_DATASOURCE_PASSWORD`, `SPRING_DATA_REDIS_PASSWORD` (+ `SPRING_DATA_REDIS_SSL_ENABLED=true` nếu cần TLS).
+- Chạy sau **HTTPS/TLS** (reverse proxy + `server.forward-headers-strategy=framework`); cookie `Secure` + `SameSite=Strict`.
+- `/actuator/prometheus` **không** route ra public ingress (chỉ scrape nội bộ).
 
-Còn có thể nâng cấp thêm (ngoài phạm vi hiện tại): xác minh email, MFA/OTP, lưu rate-limit ở Redis cho nhiều máy.
+Còn có thể nâng cấp thêm (ngoài phạm vi hiện tại): xác minh email, MFA/OTP, nối cổng thanh toán thật (thay PaymentService mock).
 
 ### Rule/Guardrail tự động
 Project có các "rule" như dự án thật (chi tiết: [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md)):
