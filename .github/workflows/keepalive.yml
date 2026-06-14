@@ -1,0 +1,19 @@
+name: keepalive
+
+# Ping BE moi 10' de Render free khong ngu (spin-down sau ~15' idle) -> demo khong dinh
+# cold-start ~50-150s. Luu y: lich cron cua GitHub Actions la best-effort (co the tre vai phut)
+# va bi tat neu repo khong hoat dong > 60 ngay. Render free ~750h/thang ~ du cho 1 service chay lien tuc.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake backend
+        run: |
+          curl -fsS --max-time 150 "https://shop-api-ryfm.onrender.com/actuator/health" -o /dev/null \
+            && echo "backend awake" \
+            || (echo "ping failed" && exit 1)

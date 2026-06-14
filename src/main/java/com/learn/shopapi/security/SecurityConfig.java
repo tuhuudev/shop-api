@@ -73,12 +73,11 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll();
                     // Swagger UI + tai lieu OpenAPI
                     auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll();
-                    // Actuator: health/liveness/readiness cong khai (cho LB + k8s probe);
-                    // prometheus + info cong khai de Prometheus scrape duoc (metrics KHONG chua secret,
-                    // BAO VE o tang mang: khong route /actuator/prometheus ra public ingress).
-                    // Cac endpoint con lai chi ADMIN.
-                    auth.requestMatchers("/actuator/health/**", "/actuator/prometheus", "/actuator/info")
-                            .permitAll();
+                    // Actuator: CHI health/liveness/readiness + info cong khai (cho LB + k8s probe).
+                    // prometheus KHONG mo public: tren hosting free (Render) khong co tang mang chan
+                    // public ingress -> metrics se lo ra internet. Doi ADMIN; scraper noi bo dung token/
+                    // mang rieng. Cac endpoint actuator con lai cung chi ADMIN.
+                    auth.requestMatchers("/actuator/health/**", "/actuator/info").permitAll();
                     auth.requestMatchers("/actuator/**").hasRole("ADMIN");
                     // --- Con lai: bat buoc dang nhap; quyen chi tiet do @PreAuthorize quyet dinh ---
                     auth.anyRequest().authenticated();
