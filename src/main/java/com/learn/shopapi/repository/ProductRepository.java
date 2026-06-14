@@ -16,6 +16,9 @@ import java.util.List;
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
     // Derived query: tim san pham theo ten gan dung (LIKE), khong phan biet hoa thuong.
+    // CANH BAO: "Containing" KHONG escape '%' / '_' -> tu khoa "50%" se khop moi dong.
+    // Duong tim kiem that su dung ProductSpecifications.nameContains (da escape qua LikePatterns).
+    // Neu can dung method nay, hay escape keyword bang LikePatterns truoc.
     List<Product> findByNameContainingIgnoreCase(String keyword);
 
     // Derived query: san pham trong khoang gia.
