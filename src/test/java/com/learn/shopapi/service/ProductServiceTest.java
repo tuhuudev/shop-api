@@ -36,7 +36,7 @@ class ProductServiceTest {
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(phones));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        ProductRequest req = new ProductRequest("iPhone", "desc", new BigDecimal("1000"), 5, 1L);
+        ProductRequest req = new ProductRequest("iPhone", "desc", new BigDecimal("1000"), 5, null, null, 1L);
         ProductResponse res = productService.create(req);
 
         assertThat(res.name()).isEqualTo("iPhone");

@@ -23,5 +23,11 @@ public record ProductRequest(
         @PositiveOrZero(message = "So luong ton khong duoc am")
         int stockQuantity,
 
+        @Size(max = 512, message = "URL anh toi da 512 ky tu")
+        String imageUrl,
+
+        @Size(max = 128, message = "Brand toi da 128 ky tu")
+        String brand,
+
         Long categoryId
 ) { }

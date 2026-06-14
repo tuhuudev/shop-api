@@ -44,6 +44,16 @@ public class Product extends Auditable {
     @Column(nullable = false)
     private int stockQuantity;
 
+    // Anh dai dien (URL CDN ngoai). brand + rating phuc vu hien thi/loc o storefront.
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
+
+    @Column(length = 128)
+    private String brand;
+
+    @Column(precision = 3, scale = 2)
+    private BigDecimal rating;
+
     // FetchType.LAZY: chi tai Category khi thuc su can (toi uu hieu nang).
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
@@ -78,6 +88,12 @@ public class Product extends Auditable {
     public void setPrice(BigDecimal price) { this.price = price; }
     public int getStockQuantity() { return stockQuantity; }
     public void setStockQuantity(int stockQuantity) { this.stockQuantity = stockQuantity; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public String getBrand() { return brand; }
+    public void setBrand(String brand) { this.brand = brand; }
+    public BigDecimal getRating() { return rating; }
+    public void setRating(BigDecimal rating) { this.rating = rating; }
     public Category getCategory() { return category; }
     public void setCategory(Category category) { this.category = category; }
     public boolean isDeleted() { return deleted; }

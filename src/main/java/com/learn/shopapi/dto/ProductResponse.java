@@ -13,6 +13,9 @@ public record ProductResponse(
         String description,
         BigDecimal price,
         int stockQuantity,
+        String imageUrl,
+        String brand,
+        BigDecimal rating,
         String categoryName
 ) {
     /** Chuyen tu Entity sang DTO. */
@@ -23,6 +26,9 @@ public record ProductResponse(
                 p.getDescription(),
                 p.getPrice(),
                 p.getStockQuantity(),
+                p.getImageUrl(),
+                p.getBrand(),
+                p.getRating(),
                 p.getCategory() != null ? p.getCategory().getName() : null
         );
     }

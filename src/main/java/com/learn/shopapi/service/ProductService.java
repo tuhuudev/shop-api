@@ -58,6 +58,8 @@ public class ProductService {
         Category category = resolveCategory(req.categoryId());
         Product product = new Product(
                 req.name(), req.description(), req.price(), req.stockQuantity(), category);
+        product.setImageUrl(req.imageUrl());
+        product.setBrand(req.brand());
         return ProductResponse.from(productRepository.save(product));
     }
 
@@ -68,6 +70,8 @@ public class ProductService {
         product.setDescription(req.description());
         product.setPrice(req.price());
         product.setStockQuantity(req.stockQuantity());
+        product.setImageUrl(req.imageUrl());
+        product.setBrand(req.brand());
         product.setCategory(resolveCategory(req.categoryId()));
         // Khong can goi save(): trong @Transactional, JPA tu phat hien thay doi (dirty checking).
         return ProductResponse.from(product);
