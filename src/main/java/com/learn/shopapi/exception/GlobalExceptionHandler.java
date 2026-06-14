@@ -4,8 +4,11 @@ import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
@@ -13,6 +16,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -21,9 +26,14 @@ import java.util.Map;
 /**
  * Bat loi cho TOAN BO controller o mot cho duy nhat -> tra ve theo chuan RFC 7807
  * (ProblemDetail, content-type application/problem+json). Nho vay client xu ly loi nhat quan.
+ *
+ * Ke thua ResponseEntityExceptionHandler de cac exception khung Spring MVC (sai HTTP method ->405,
+ * Content-Type khong ho tro ->415, type-mismatch/thieu param ->400, khong tim thay route ->404...)
+ * duoc map dung ma 4xx TRUOC khi roi vao luoi cuoi Exception->500. Cac template method
+ * handleHttpMessageNotReadable/handleMethodArgumentNotValid duoc override de giu title/format tieng Viet.
  */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -64,23 +74,26 @@ public class GlobalExceptionHandler {
                 "Du lieu vua bi thay doi boi mot thao tac khac, vui long thu lai");
     }
 
-    // JSON gui len sai dinh dang / thieu field bat buoc -> 400
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex) {
-        return problem(HttpStatus.BAD_REQUEST, "Body khong doc duoc",
+    // JSON gui len sai dinh dang / thieu field bat buoc -> 400 (override template cua superclass)
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Body khong doc duoc",
                 "Body JSON khong hop le hoac thieu truong bat buoc");
+        return handleExceptionInternal(ex, pd, headers, HttpStatus.BAD_REQUEST, request);
     }
 
-    // Validation that bai (@NotBlank, @Positive...) -> 400 kem chi tiet tung field
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
+    // Validation that bai (@NotBlank, @Positive...) -> 400 kem chi tiet tung field (override template)
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         Map<String, String> fieldErrors = new HashMap<>();
         ex.getBindingResult().getFieldErrors()
                 .forEach(e -> fieldErrors.put(e.getField(), e.getDefaultMessage()));
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Du lieu khong hop le",
                 "Mot so truong khong dat yeu cau");
         pd.setProperty("errors", fieldErrors);
-        return pd;
+        return handleExceptionInternal(ex, pd, headers, HttpStatus.BAD_REQUEST, request);
     }
 
     // Validation o tang service/Hibernate (@Validated, constraint tren entity) -> 400 kem tung field

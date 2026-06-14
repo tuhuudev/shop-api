@@ -22,6 +22,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -84,5 +86,22 @@ class ProductControllerWebMvcTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.title").value("Khong du quyen"))
                 .andExpect(jsonPath("$.status").value(403));
+    }
+
+    // Regression: id khong phai so -> type mismatch -> 400 (KHONG con 500), endpoint GET cong khai.
+    @Test
+    void get_idKhongPhaiSo_tra400() throws Exception {
+        mvc.perform(get("/api/products/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    // Regression: sai HTTP method tren path ton tai -> 405 (khong roi vao fallback 500).
+    @Test
+    @WithMockUser(roles = "STAFF")
+    void wrongHttpMethod_tra405() throws Exception {
+        mvc.perform(patch("/api/products/1"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
     }
 }
