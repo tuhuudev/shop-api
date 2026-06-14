@@ -233,7 +233,50 @@ Project có các "rule" như dự án thật (chi tiết: [`docs/CONVENTIONS.md`
 
 ---
 
-## 8. Khái niệm cần tra khi gặp trong code
+## 8. Biến môi trường production
+
+Profile `prod` cấu hình hoàn toàn qua biến môi trường. Bảng dưới liệt kê **đủ** nhóm DB / Redis / JWT / webhook / CORS.
+Cột *Default* là giá trị dev (trong `application.properties` / khoá trong repo) — **dùng ở prod là LỘ/không an toàn**.
+
+| Biến | Bắt buộc (prod)? | Default (dev) | Ý nghĩa | Hành vi nếu thiếu |
+|------|------------------|---------------|---------|-------------------|
+| `SPRING_DATASOURCE_URL` | Nên đặt | `jdbc:postgresql://localhost:5432/shopdb` | JDBC URL Postgres | Trỏ `localhost` dev → không nối được DB prod |
+| `SPRING_DATASOURCE_USERNAME` | Nên đặt | `postgres` | User DB | Dùng user dev |
+| `SPRING_DATASOURCE_PASSWORD` | **Có** | `shop123` | Mật khẩu DB | Dùng mật khẩu dev `shop123` → **LỘ** |
+| `SPRING_DATA_REDIS_HOST` | Nên đặt | `localhost` | Host Redis | Trỏ `localhost` dev |
+| `SPRING_DATA_REDIS_PORT` | Không | `6379` | Port Redis | Dùng 6379 |
+| `SPRING_DATA_REDIS_PASSWORD` | **Có** nếu Redis bật AUTH | *(rỗng)* | Mật khẩu Redis | Kết nối không auth → **LỘ** nếu Redis đi qua mạng (đang giữ rate-limit/login-attempt/idempotency) |
+| `SPRING_DATA_REDIS_SSL_ENABLED` | Bật nếu qua mạng không tin cậy | `false` | TLS tới Redis | Kết nối plaintext |
+| `APP_JWT_PRIVATE_KEY` | **Có** | `keys/*.pem` (classpath) | Private key RS256 ký token | Dùng khoá dev trong repo → ai cũng **ký được token** → LỘ |
+| `APP_JWT_PUBLIC_KEY` | **Có** | `keys/*.pem` (classpath) | Public key verify token | Dùng khoá dev trong repo |
+| `APP_PAYMENTS_WEBHOOK_SECRET` | **Có** | `dev-webhook-secret` | HMAC secret xác thực webhook thanh toán | **Fail-fast**: prod **không khởi động** nếu rỗng hoặc `=dev-webhook-secret` (`PaymentService:49-53`) — nếu không, kẻ ngoài giả mạo webhook → mark đơn PAID |
+| `APP_CORS_ALLOWED_ORIGINS` | Nên đặt | *(rỗng)* | Origin frontend được phép (phân tách dấu phẩy) | Rỗng → không origin cross-site nào gọi API từ browser |
+| `DB_POOL_MAX_SIZE` | Không | `10` | Hikari max pool size | Dùng 10 (điều chỉnh theo số pod) |
+| `MANAGEMENT_OTLP_TRACING_ENDPOINT` | Không | *(none)* | Endpoint OTLP collector (tracing) | Không xuất span ra collector |
+| `TRACING_SAMPLING` | Không | `1.0` dev / `0.1` prod | Tỉ lệ lấy mẫu trace | Dùng default theo profile |
+
+> Mẫu khai báo: xem [`.env.example`](.env.example). Tuyệt đối **không commit** `.env` thật / private key.
+
+### Kiểm chứng readiness
+
+`/actuator/health` tách hai nhóm probe (k8s/LB):
+
+- **Liveness** (`/actuator/health/liveness`): tiến trình còn sống? Chỉ fail khi JVM hỏng → orchestrator **restart** pod. Không phụ thuộc DB/Redis.
+- **Readiness** (`/actuator/health/readiness`): sẵn sàng nhận traffic? Gồm `db`, `redis` (TCP/PING) và `redisReadiness` (round-trip write+read). Mất DB/Redis → **`503`** → LB ngừng đưa traffic (không restart).
+
+```bash
+# UP  -> HTTP 200, {"status":"UP",...}
+curl -i http://localhost:8080/actuator/health/readiness
+# Dung Postgres hoac Redis (docker compose stop db | redis) -> HTTP 503, {"status":"OUT_OF_SERVICE"/"DOWN",...}
+```
+
+`redisReadiness` không chỉ PING mà `SET` một key TTL ngắn rồi `GET` so khớp → bắt được Redis read-only / mất quyền ghi mà PING vẫn OK.
+
+> `render.yaml` dùng `healthCheckPath: /actuator/health/liveness` (không phải readiness): Render chỉ chạy 1 instance, dùng health check để quyết định **restart** — nếu trỏ readiness thì khi DB/Redis chớp nháy Render sẽ restart cả app (vòng lặp khởi động lại) thay vì chỉ tạm ngừng traffic. Readiness vẫn dùng cho LB/k8s nhiều instance.
+
+---
+
+## 9. Khái niệm cần tra khi gặp trong code
 
 `@Entity` `@Id` `@GeneratedValue` · `@OneToMany`/`@ManyToOne` · `@Repository` / Spring Data JPA ·
 `@Service` `@RestController` · Dependency Injection (constructor) · `@Transactional` · DTO · Bean Validation (`@Valid`) ·
