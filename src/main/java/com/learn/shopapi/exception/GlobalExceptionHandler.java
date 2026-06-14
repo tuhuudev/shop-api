@@ -1,9 +1,14 @@
 package com.learn.shopapi.exception;
 
+import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,6 +24,8 @@ import java.util.Map;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     // Khong tim thay -> 404
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -74,6 +81,43 @@ public class GlobalExceptionHandler {
                 "Mot so truong khong dat yeu cau");
         pd.setProperty("errors", fieldErrors);
         return pd;
+    }
+
+    // Validation o tang service/Hibernate (@Validated, constraint tren entity) -> 400 kem tung field
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ProblemDetail handleConstraintViolation(ConstraintViolationException ex) {
+        Map<String, String> fieldErrors = new HashMap<>();
+        ex.getConstraintViolations().forEach(v -> {
+            String path = v.getPropertyPath().toString();
+            String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+            fieldErrors.put(field, v.getMessage());
+        });
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Du lieu khong hop le",
+                "Mot so truong khong dat yeu cau");
+        pd.setProperty("errors", fieldErrors);
+        return pd;
+    }
+
+    // Vi pham rang buoc toan ven DB (unique/FK/not-null) -> 409. KHONG leak SQL/ten cot (lo schema).
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation", ex);
+        return problem(HttpStatus.CONFLICT, "Xung dot du lieu",
+                "Du lieu vi pham rang buoc toan ven (trung lap hoac tham chieu khong hop le)");
+    }
+
+    // Rethrow de ExceptionTranslationFilter/RestAccessDeniedHandler giu nguyen 403 (khong roi vao fallback).
+    @ExceptionHandler(AccessDeniedException.class)
+    public void handleAccessDenied(AccessDeniedException ex) {
+        throw ex;
+    }
+
+    // Luoi cuoi: loi chua co handler rieng -> 500 generic. Giu chi tiet o log server, KHONG tra ve client.
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleFallback(Exception ex) {
+        log.error("Unhandled exception", ex);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Loi he thong",
+                "Da co loi xay ra, vui long thu lai sau");
     }
 
     /** Tao ProblemDetail chuan, them moc thoi gian. */
