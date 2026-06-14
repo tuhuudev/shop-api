@@ -49,6 +49,20 @@ user đăng nhập lại. Prod thật nên inject khóa qua secret/file mount th
 - Swagger: `https://<app>.onrender.com/swagger-ui.html`
 - Login thử tài khoản seed (`admin/admin123`) qua `POST /api/auth/login`.
 
+## Cold-start & keepalive (Render free)
+Render free **ngủ sau ~15' không có request** → request kế tiếp **cold-start ~45–100s**. Hệ quả thực tế:
+demo bị chậm lần đầu, VÀ **Vercel build client có thể fail** (trang chủ ISR fetch BE lúc build — nếu BE
+đang cold, fetch treo). Đã chống ở FE: `api-server.ts` race fetch với timer 6s → build luôn xong dù BE
+ngủ (ISR nạp lại lúc runtime). Còn để giữ BE **luôn ấm**:
+
+- **Khuyến nghị — external uptime monitor (free, ~2 phút):** [UptimeRobot](https://uptimerobot.com) hoặc
+  [cron-job.org] → tạo HTTP monitor GET `https://<app>.onrender.com/actuator/health` mỗi **5 phút**.
+  Đáng tin hơn hẳn GitHub cron. (Render free ~750h/tháng đủ cho 1 service chạy liên tục.)
+- **Phụ — GitHub Actions** (`.github/workflows/keepalive.yml`): có sẵn, ping mỗi 10'. **Lưu ý**: lịch
+  `schedule` của GitHub rất hay bị trễ/bỏ qua trên repo free → KHÔNG dựa làm chính. Chạy tay để test:
+  `gh workflow run keepalive.yml` (hoặc tab Actions → Run workflow).
+- **Triệt để** (khi cần prod thật): Render plan trả phí (always-on) — hết cold-start.
+
 ## CD
 `autoDeploy: true` trong `render.yaml` → mỗi lần push `main` Render tự build + deploy lại. Không cần GitHub Actions cho deploy. (CI ở `.github/workflows/ci.yml` vẫn chạy test trước.)
 
