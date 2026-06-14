@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -80,6 +81,35 @@ class OrderServiceTest {
         verify(productRepository).decrementStock(any(), eq(3));        // da tru kho atomic
         verify(orderRepository).save(any(Order.class));
         verify(inventoryMovementRepository).save(any());              // ghi nhat ky xuat kho
+    }
+
+    @Test
+    void createOrder_nhieuDongCungProductId_truKhoVaGhiMovementTungDong() {
+        Customer an = new Customer("An", "an@example.com");
+        Product kb = new Product("Ban phim", "desc", new BigDecimal("100"), 10, null);
+        when(customerRepository.findByUserUsername("customer")).thenReturn(Optional.of(an));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(kb));
+        when(productRepository.decrementStock(any(), anyInt())).thenReturn(1);   // du kho ca 2 lan
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // 2 dong CUNG productId=1 (Order.addItem khong gop) -> ky vong 2 OrderItem
+        OrderRequest req = new OrderRequest(null,
+                List.of(new OrderRequest.OrderLine(1L, 2),
+                        new OrderRequest.OrderLine(1L, 3)), null, null);
+
+        OrderResponse res = orderService.createOrder(req);
+
+        assertThat(res.totalAmount()).isEqualByComparingTo("500");   // 100*2 + 100*3
+
+        ArgumentCaptor<Order> savedOrder = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(savedOrder.capture());
+        assertThat(savedOrder.getValue().getItems()).hasSize(2);
+
+        verify(productRepository, times(2)).findById(1L);            // duyet du 2 dong
+        verify(productRepository).decrementStock(any(), eq(2));      // tru kho dong 1
+        verify(productRepository).decrementStock(any(), eq(3));      // tru kho dong 2
+        verify(productRepository, times(2)).decrementStock(any(), anyInt());
+        verify(inventoryMovementRepository, times(2)).save(any());   // moi OrderItem 1 ban ghi
     }
 
     @Test
