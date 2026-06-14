@@ -131,6 +131,29 @@ class OrderServiceTest {
     }
 
     @Test
+    void createOrder_hetKhoODongThuHai_nemLoiVaKhongLuu() {
+        Customer an = new Customer("An", "an@example.com");
+        Product kb = new Product("Ban phim", "desc", new BigDecimal("100"), 10, null);
+        when(customerRepository.findByUserUsername("customer")).thenReturn(Optional.of(an));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(kb));
+        when(productRepository.decrementStock(any(), anyInt()))
+                .thenReturn(1)    // dong 1: du kho
+                .thenReturn(0);   // dong 2: het kho
+
+        OrderRequest req = new OrderRequest(null,
+                List.of(new OrderRequest.OrderLine(1L, 2),
+                        new OrderRequest.OrderLine(1L, 5)), null, null);
+
+        assertThatThrownBy(() -> orderService.createOrder(req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("khong du ton kho");
+
+        verify(productRepository, times(2)).decrementStock(any(), anyInt());   // da thu ca 2 dong
+        verify(orderRepository, never()).save(any());            // khong luu don nao
+        verify(inventoryMovementRepository, never()).save(any()); // khong ghi nhat ky xuat kho
+    }
+
+    @Test
     void createOrder_coupon_giamTongTien() {
         Customer an = new Customer("An", "an@example.com");
         Product kb = new Product("Ban phim", "desc", new BigDecimal("100"), 10, null);
