@@ -100,4 +100,28 @@ class CouponServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("khong con hieu luc");
     }
+
+    @Test
+    void chuaToiNgayHieuLuc_validFromTrongTuongLai_nem_vaKhongTruLuot() {
+        Coupon c = new Coupon("SOON", CouponType.FIXED, new BigDecimal("10.00"));
+        c.setValidFrom(LocalDateTime.now().plusDays(1));
+        stubFind(c);
+
+        assertThatThrownBy(() -> couponService.applyToSubtotal("SOON", new BigDecimal("50.00")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("khong con hieu luc");
+        verify(couponRepository, never()).tryConsume(any());
+    }
+
+    @Test
+    void percent_lamTronHalfUp() {
+        Coupon c = new Coupon("HALF", CouponType.PERCENT, new BigDecimal("10"));
+        stubFind(c);
+        when(couponRepository.tryConsume(any())).thenReturn(1);
+
+        // 99.99 * 10% = 9.999 -> HALF_UP scale 2 = 10.00
+        BigDecimal discount = couponService.applyToSubtotal("HALF", new BigDecimal("99.99"));
+
+        assertThat(discount).isEqualByComparingTo("10.00");
+    }
 }
