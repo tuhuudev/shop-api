@@ -54,6 +54,10 @@ public class Product extends Auditable {
     @Column(precision = 3, scale = 2)
     private BigDecimal rating;
 
+    // Gallery: cac URL anh cach nhau bang xuong dong (DTO tach thanh List). Anh dai dien = imageUrl.
+    @Column(name = "image_urls", length = 2000)
+    private String imageUrls;
+
     // FetchType.LAZY: chi tai Category khi thuc su can (toi uu hieu nang).
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
@@ -94,6 +98,8 @@ public class Product extends Auditable {
     public void setBrand(String brand) { this.brand = brand; }
     public BigDecimal getRating() { return rating; }
     public void setRating(BigDecimal rating) { this.rating = rating; }
+    public String getImageUrls() { return imageUrls; }
+    public void setImageUrls(String imageUrls) { this.imageUrls = imageUrls; }
     public Category getCategory() { return category; }
     public void setCategory(Category category) { this.category = category; }
     public boolean isDeleted() { return deleted; }
