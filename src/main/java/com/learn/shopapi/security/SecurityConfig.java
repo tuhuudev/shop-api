@@ -107,17 +107,18 @@ public class SecurityConfig {
     }
 
     /**
-     * Cau hinh CORS: chi cho cac origin liet ke trong app.cors.allowed-origins goi API tu trinh duyet.
+     * Cau hinh CORS: chi cho cac origin khop app.cors.allowed-origins goi API tu trinh duyet.
      * De trong -> khong origin nao duoc phep (chi same-origin), an toan mac dinh.
+     * Dung setAllowedOriginPatterns -> nhan ca gia tri cu the LAN wildcard (vd https://*.vercel.app
+     * cho cac preview deploy), van hop le voi allowCredentials=true (khac "*" tuyet doi von bi cam).
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(corsAllowedOrigins);
+        config.setAllowedOriginPatterns(corsAllowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         // Cho phep gui cookie (refresh token httpOnly) kem request cross-origin.
-        // Bat buoc allowedOrigins phai cu the (khong duoc "*") - da dam bao o tren.
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
