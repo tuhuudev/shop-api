@@ -322,7 +322,7 @@
 									<goal>check</goal>
 								</goals>
 								<configuration>
-									<haltOnFailure>false</haltOnFailure>
+									<haltOnFailure>true</haltOnFailure>
 									<rules>
 										<rule>
 											<element>BUNDLE</element>
@@ -335,7 +335,7 @@
 												<limit>
 													<counter>LINE</counter>
 													<value>COVEREDRATIO</value>
-													<minimum>0.50</minimum>
+													<minimum>0.65</minimum>
 												</limit>
 											</limits>
 										</rule>
@@ -345,14 +345,14 @@
 						</executions>
 					</plugin>
 
-					<!-- OWASP Dependency-Check: quet CVE thu vien. failBuildOnCVSS=11 = chi bao cao
+					<!-- OWASP Dependency-Check: quet CVE thu vien. failBuildOnCVSS=7 = chan high/critical
 					     (ha xuong 7-8 de chan high/critical). NVD nhanh hon neu truyen -DnvdApiKey=... -->
 					<plugin>
 						<groupId>org.owasp</groupId>
 						<artifactId>dependency-check-maven</artifactId>
 						<version>10.0.4</version>
 						<configuration>
-							<failBuildOnCVSS>11</failBuildOnCVSS>
+							<failBuildOnCVSS>7</failBuildOnCVSS>
 							<!-- Tat OSS Index analyzer: can tai khoan Sonatype, khong co se 401 -> fail build.
 							     NVD van la nguon CVE chinh nen tat cai nay khong giam dang ke do bao phu. -->
 							<ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
@@ -377,10 +377,9 @@
 						<version>4.8.6.4</version>
 						<configuration>
 							<effort>Max</effort>
-							<threshold>Medium</threshold>
-							<failOnError>false</failOnError>
-							<includeFilterFile/>
-							<plugins>
+							<threshold>High</threshold>
+							<failOnError>true</failOnError>
+														<plugins>
 								<plugin>
 									<groupId>com.h3xstream.findsecbugs</groupId>
 									<artifactId>findsecbugs-plugin</artifactId>
