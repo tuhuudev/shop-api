@@ -19,13 +19,22 @@ public final class ProductSpecifications {
 
     private ProductSpecifications() { }
 
+    /** Ky tu escape cho LIKE - de coi '%' va '_' trong tu khoa la ky tu thuong, khong phai wildcard. */
+    private static final char LIKE_ESCAPE = '\\';
+
     /** Ten chua tu khoa (khong phan biet hoa thuong). */
     public static Specification<Product> nameContains(String keyword) {
         return (root, query, cb) -> {
             if (keyword == null || keyword.isBlank()) {
                 return cb.conjunction();
             }
-            return cb.like(cb.lower(root.get("name")), "%" + keyword.toLowerCase() + "%");
+            // Escape wildcard LIKE ('\', '%', '_') de tu khoa "50%" khong khop moi san pham.
+            // Thu tu quan trong: escape ky tu escape ('\') TRUOC, roi moi den '%' va '_'.
+            String pattern = keyword.toLowerCase()
+                    .replace("\\", "\\\\")
+                    .replace("%", "\\%")
+                    .replace("_", "\\_");
+            return cb.like(cb.lower(root.get("name")), "%" + pattern + "%", LIKE_ESCAPE);
         };
     }
 
