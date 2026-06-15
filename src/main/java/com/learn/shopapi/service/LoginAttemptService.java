@@ -2,9 +2,11 @@ package com.learn.shopapi.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * Chong do mat khau (brute-force): dem so lan dang nhap sai theo tung username, LUU TREN REDIS
@@ -17,6 +19,13 @@ import java.time.Duration;
 public class LoginAttemptService {
 
     private static final String KEY_PREFIX = "shop:login-fail:";
+
+    // INCR + EXPIRE ATOMIC (Lua) -> tranh race chet-giua-2-lenh lam key khong co TTL (khoa vinh vien).
+    // Giu cua so CO DINH nhu cu: chi dat TTL o lan sai dau (c == 1). Giong RateLimitFilter.
+    private static final RedisScript<Long> INCR_WITH_TTL = RedisScript.of(
+            "local c = redis.call('INCR', KEYS[1]); "
+                    + "if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return c",
+            Long.class);
 
     private final StringRedisTemplate redis;
     private final int maxAttempts;
@@ -35,12 +44,9 @@ public class LoginAttemptService {
         return v != null && Integer.parseInt(v) >= maxAttempts;
     }
 
-    /** Tang dem khi sai; lan dau dat TTL = cua so khoa (atomic INCR cua Redis). */
+    /** Tang dem khi sai; lan dau dat TTL = cua so khoa. INCR+EXPIRE atomic (Lua) -> khong race. */
     public void recordFailure(String username) {
-        Long count = redis.opsForValue().increment(key(username));
-        if (count != null && count == 1L) {
-            redis.expire(key(username), window);
-        }
+        redis.execute(INCR_WITH_TTL, List.of(key(username)), String.valueOf(window.toSeconds()));
     }
 
     /** Dang nhap dung -> xoa lich su sai. */
