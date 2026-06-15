@@ -12,7 +12,6 @@ import com.learn.shopapi.repository.ReviewRepository;
 import com.learn.shopapi.repository.UserRepository;
 import com.learn.shopapi.security.SecurityUtils;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,8 +37,7 @@ public class ReviewService {
     public ReviewResponse addReview(Long productId, ReviewRequest req) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay san pham id=" + productId));
-        String username = SecurityUtils.getCurrentUsername()
-                .orElseThrow(() -> new AccessDeniedException("Chua dang nhap"));
+        String username = SecurityUtils.requireCurrentUsername();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay user: " + username));
         Review saved = reviewRepository.save(new Review(product, user, req.rating(), req.comment()));

@@ -5,6 +5,7 @@ import com.learn.shopapi.dto.CartResponse;
 import com.learn.shopapi.dto.CheckoutRequest;
 import com.learn.shopapi.dto.OrderResponse;
 import com.learn.shopapi.service.CartService;
+import com.learn.shopapi.service.IdempotencyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,10 +25,10 @@ import org.springframework.web.bind.annotation.*;
 public class CartController {
 
     private final CartService cartService;
-    private final com.learn.shopapi.service.IdempotencyService idempotencyService;
+    private final IdempotencyService idempotencyService;
 
     public CartController(CartService cartService,
-                          com.learn.shopapi.service.IdempotencyService idempotencyService) {
+                          IdempotencyService idempotencyService) {
         this.cartService = cartService;
         this.idempotencyService = idempotencyService;
     }

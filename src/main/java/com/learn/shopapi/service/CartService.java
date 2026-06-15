@@ -13,7 +13,6 @@ import com.learn.shopapi.repository.CartRepository;
 import com.learn.shopapi.repository.ProductRepository;
 import com.learn.shopapi.repository.UserRepository;
 import com.learn.shopapi.security.SecurityUtils;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,7 +41,7 @@ public class CartService {
 
     @Transactional(readOnly = true)
     public CartResponse view() {
-        return cartRepository.findByUserUsername(currentUsername())
+        return cartRepository.findByUserUsername(SecurityUtils.requireCurrentUsername())
                 .map(CartResponse::from)
                 .orElse(new CartResponse(List.of(), BigDecimal.ZERO));  // chua co gio -> rong
     }
@@ -105,17 +104,12 @@ public class CartService {
     // ---- helper ----
 
     private Cart getOrCreateCart() {
-        String username = currentUsername();
+        String username = SecurityUtils.requireCurrentUsername();
         return cartRepository.findByUserUsername(username)
                 .orElseGet(() -> {
                     User user = userRepository.findByUsername(username)
                             .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay user: " + username));
                     return cartRepository.save(new Cart(user));
                 });
-    }
-
-    private String currentUsername() {
-        return SecurityUtils.getCurrentUsername()
-                .orElseThrow(() -> new AccessDeniedException("Chua dang nhap"));
     }
 }

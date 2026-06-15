@@ -4,6 +4,7 @@ import com.learn.shopapi.dto.OrderRequest;
 import com.learn.shopapi.dto.OrderResponse;
 import com.learn.shopapi.dto.PageResponse;
 import com.learn.shopapi.entity.OrderStatus;
+import com.learn.shopapi.service.IdempotencyService;
 import com.learn.shopapi.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -26,10 +27,10 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
-    private final com.learn.shopapi.service.IdempotencyService idempotencyService;
+    private final IdempotencyService idempotencyService;
 
     public OrderController(OrderService orderService,
-                           com.learn.shopapi.service.IdempotencyService idempotencyService) {
+                           IdempotencyService idempotencyService) {
         this.orderService = orderService;
         this.idempotencyService = idempotencyService;
     }

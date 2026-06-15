@@ -79,11 +79,9 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
         // Ghi nhat ky xuat kho (ORDER_OUT) sau khi co order id.
-        String actor = SecurityUtils.getCurrentUsername().orElse("system");
         for (OrderItem item : saved.getItems()) {
-            inventoryMovementRepository.save(new InventoryMovement(
-                    item.getProduct().getId(), -item.getQuantity(),
-                    InventoryMovementReason.ORDER_OUT, saved.getId(), actor));
+            logMovement(item.getProduct().getId(), -item.getQuantity(),
+                    InventoryMovementReason.ORDER_OUT, saved.getId());
         }
         return OrderResponse.from(saved);
     }
@@ -96,7 +94,7 @@ public class OrderService {
         if (SecurityUtils.hasAnyRole("STAFF", "ADMIN")) {
             return PageResponse.from(orderRepository.findAll(pageable), OrderResponse::from);
         }
-        String username = currentUsername();
+        String username = SecurityUtils.requireCurrentUsername();
         return PageResponse.from(
                 orderRepository.findByCustomerUserUsername(username, pageable), OrderResponse::from);
     }
@@ -167,13 +165,17 @@ public class OrderService {
 
     /** Cong tra so luong cua tung dong hang ve ton kho (khi huy/hoan don) - ATOMIC tai DB + ghi nhat ky. */
     private void restock(Order order) {
-        String actor = SecurityUtils.getCurrentUsername().orElse("system");
         for (OrderItem item : order.getItems()) {
             productRepository.incrementStock(item.getProduct().getId(), item.getQuantity());
-            inventoryMovementRepository.save(new InventoryMovement(
-                    item.getProduct().getId(), item.getQuantity(),
-                    InventoryMovementReason.RESTOCK, order.getId(), actor));
+            logMovement(item.getProduct().getId(), item.getQuantity(),
+                    InventoryMovementReason.RESTOCK, order.getId());
         }
+    }
+
+    /** Ghi 1 dong nhat ky bien dong ton kho, gan actor = nguoi dang dang nhap (job nen -> "system"). */
+    private void logMovement(Long productId, int changeQty, InventoryMovementReason reason, Long orderId) {
+        String actor = SecurityUtils.getCurrentUsername().orElse("system");
+        inventoryMovementRepository.save(new InventoryMovement(productId, changeQty, reason, orderId, actor));
     }
 
     /**
@@ -215,7 +217,7 @@ public class OrderService {
             return customerRepository.findById(requestedCustomerId)
                     .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay khach hang id=" + requestedCustomerId));
         }
-        String username = currentUsername();
+        String username = SecurityUtils.requireCurrentUsername();
         return customerRepository.findByUserUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Tai khoan '" + username + "' chua co ho so khach hang de dat don"));
@@ -226,15 +228,10 @@ public class OrderService {
         if (SecurityUtils.hasAnyRole("STAFF", "ADMIN")) {
             return;
         }
-        String username = currentUsername();
+        String username = SecurityUtils.requireCurrentUsername();
         User owner = order.getCustomer().getUser();
         if (owner == null || !username.equals(owner.getUsername())) {
             throw new AccessDeniedException("Ban khong duoc xem don hang nay");
         }
-    }
-
-    private String currentUsername() {
-        return SecurityUtils.getCurrentUsername()
-                .orElseThrow(() -> new AccessDeniedException("Chua dang nhap"));
     }
 }

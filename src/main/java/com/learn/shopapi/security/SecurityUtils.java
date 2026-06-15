@@ -1,5 +1,6 @@
 package com.learn.shopapi.security;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +21,15 @@ public final class SecurityUtils {
             return Optional.empty();
         }
         return Optional.of(auth.getName());
+    }
+
+    /**
+     * Username cua nguoi dang dang nhap, hoac nem AccessDeniedException neu chua dang nhap.
+     * Dung cho cac luong nghiep vu BAT BUOC co user (dat don, gio hang, danh gia...).
+     */
+    public static String requireCurrentUsername() {
+        return getCurrentUsername()
+                .orElseThrow(() -> new AccessDeniedException("Chua dang nhap"));
     }
 
     /** True neu nguoi dang dang nhap co it nhat 1 trong cac vai tro truyen vao (vd "STAFF","ADMIN"). */
