@@ -346,7 +346,7 @@
 					</plugin>
 
 					<!-- OWASP Dependency-Check: quet CVE thu vien. failBuildOnCVSS=7 = chan high/critical
-					     (ha xuong 7-8 de chan high/critical). NVD nhanh hon neu truyen -DnvdApiKey=... -->
+					     (CVSS >= 7.0). NVD nhanh hon neu truyen -DnvdApiKey=... -->
 					<plugin>
 						<groupId>org.owasp</groupId>
 						<artifactId>dependency-check-maven</artifactId>
@@ -379,7 +379,7 @@
 							<effort>Max</effort>
 							<threshold>High</threshold>
 							<failOnError>true</failOnError>
-														<plugins>
+							<plugins>
 								<plugin>
 									<groupId>com.h3xstream.findsecbugs</groupId>
 									<artifactId>findsecbugs-plugin</artifactId>
