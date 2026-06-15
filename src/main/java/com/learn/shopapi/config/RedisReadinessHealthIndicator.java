@@ -19,10 +19,15 @@ import java.util.UUID;
 @Component
 public class RedisReadinessHealthIndicator implements HealthIndicator {
 
-    private static final String KEY = "__health:readiness";
+    // Key RIENG cho moi instance (sinh 1 lan luc khoi tao). Neu dung key chung, 2 pod chay
+    // readiness probe cung cua so TTL se ghi de gia tri cua nhau -> GET doc ve gia tri pod khac
+    // -> mismatch -> DOWN gia -> k8s rut pod khoi service du Redis van khoe. Key per-instance
+    // cach ly hoan toan round-trip giua cac pod.
+    private static final String KEY_PREFIX = "__health:readiness:";
     private static final Duration TTL = Duration.ofSeconds(5);
 
     private final StringRedisTemplate redis;
+    private final String key = KEY_PREFIX + UUID.randomUUID();
 
     public RedisReadinessHealthIndicator(StringRedisTemplate redis) {
         this.redis = redis;
@@ -32,8 +37,8 @@ public class RedisReadinessHealthIndicator implements HealthIndicator {
     public Health health() {
         String expected = UUID.randomUUID().toString();
         try {
-            redis.opsForValue().set(KEY, expected, TTL);
-            String actual = redis.opsForValue().get(KEY);
+            redis.opsForValue().set(key, expected, TTL);
+            String actual = redis.opsForValue().get(key);
             if (expected.equals(actual)) {
                 return Health.up().withDetail("redis", "write+read round-trip OK").build();
             }

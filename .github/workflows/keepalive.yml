@@ -1,11 +1,11 @@
 name: keepalive
 
-# Ping BE moi 10' de Render free khong ngu (spin-down sau ~15' idle) -> demo khong dinh
-# cold-start ~50-150s. Luu y: lich cron cua GitHub Actions la best-effort (co the tre vai phut)
-# va bi tat neu repo khong hoat dong > 60 ngay. Render free ~750h/thang ~ du cho 1 service chay lien tuc.
+# Ping BE moi 5' de Render free khong ngu (spin-down sau ~15' idle) -> demo khong dinh
+# cold-start ~50-150s. Cron */5 (thay vi */10) du buffer vi lich cron GitHub Actions la best-effort
+# (co the tre vai phut). Bi tat neu repo khong hoat dong > 60 ngay. Render free ~750h/thang.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -13,7 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wake backend
+        # Ping /liveness (KHONG dung DB/Redis) chi de danh thuc container - bat ky request nao
+        # cung wake. --retry 5 + --retry-all-errors + --retry-delay 30 cho cold-start co them ~3-4'
+        # co hoi boot xong thay vi fail ngay sau 1 lan 150s.
         run: |
-          curl -fsS --max-time 150 "https://shop-api-ryfm.onrender.com/actuator/health" -o /dev/null \
+          curl -fsS --max-time 60 --retry 5 --retry-all-errors --retry-delay 30 \
+            "https://shop-api-ryfm.onrender.com/actuator/health/liveness" -o /dev/null \
             && echo "backend awake" \
             || (echo "ping failed" && exit 1)
