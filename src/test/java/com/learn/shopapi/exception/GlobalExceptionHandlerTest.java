@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ProblemDetail;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Map;
@@ -60,6 +61,15 @@ class GlobalExceptionHandlerTest {
                 .doesNotContain("uk_users_email")
                 .doesNotContain("unique constraint")
                 .doesNotContain("duplicate key");
+    }
+
+    @Test
+    void optimisticLock_tra409() {
+        ProblemDetail pd = handler.handleOptimisticLock(
+                new ObjectOptimisticLockingFailureException("com.learn.shopapi.entity.Order", 1L));
+
+        assertThat(pd.getStatus()).isEqualTo(409);
+        assertThat(pd.getTitle()).isEqualTo("Xung dot du lieu");
     }
 
     @Test
