@@ -77,8 +77,8 @@ class OrderConcurrencyHttpIntegrationTest extends AbstractIntegrationTest {
 
     /**
      * (2) OPTIMISTIC-LOCK 409: tao 1 don PENDING, 2 POST /api/orders/{id}/pay dong thoi tren cung order
-     * -> dung 1x200 + 1x409. Order.@Version khien tx commit sau nem ObjectOptimisticLockingFailureException
-     * -> GlobalExceptionHandler tra ProblemDetail 409 (application/problem+json).
+     * -> dung 1x200; request con lai 409 (Order.@Version: tx commit sau nem ObjectOptimisticLockingFailureException)
+     * hoac 400 (neu no doc don sau khi tx dau da commit). Thoi diem quyet dinh nen test chap nhan ca hai.
      */
     @Test
     void haiPayDongThoi_motThanhCong_motOptimisticLock409() throws Exception {
@@ -98,12 +98,16 @@ class OrderConcurrencyHttpIntegrationTest extends AbstractIntegrationTest {
                         .andReturn().getResponse());
 
         List<Integer> statuses = responses.stream().map(MockHttpServletResponse::getStatus).toList();
+        // Dung 1 lan thanh toan thanh cong. Request thua co 2 ket qua hop le tuy thoi diem:
+        //  - 409: hai tx doc cung version -> tx commit sau dinh optimistic lock;
+        //  - 400: tx sau doc don SAU khi tx dau da commit -> don da PAID, khong chuyen trang thai duoc.
+        // Ca hai deu la problem+json. Mapping 409 duoc kiem rieng (deterministic) o GlobalExceptionHandlerTest.
         assertThat(statuses).filteredOn(s -> s == 200).hasSize(1);
-        assertThat(statuses).filteredOn(s -> s == 409).hasSize(1);
+        assertThat(statuses).filteredOn(s -> s != 200).singleElement().isIn(400, 409);
 
-        MockHttpServletResponse conflict = responses.stream()
-                .filter(r -> r.getStatus() == 409).findFirst().orElseThrow();
-        assertThat(conflict.getContentType()).contains(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        MockHttpServletResponse loser = responses.stream()
+                .filter(r -> r.getStatus() != 200).findFirst().orElseThrow();
+        assertThat(loser.getContentType()).contains(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     }
 
     /**
