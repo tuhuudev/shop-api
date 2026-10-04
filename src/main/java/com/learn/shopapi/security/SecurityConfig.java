@@ -66,6 +66,10 @@ public class SecurityConfig {
                     // (nho vay user bi khoa cam token cu se nhan 401 ro rang o /me).
                     auth.requestMatchers("/api/auth/register", "/api/auth/login",
                             "/api/auth/refresh", "/api/auth/logout").permitAll();
+                    // Trang loi cua container: loi nem ra tu FILTER (khong qua @ControllerAdvice) duoc
+                    // forward toi /error. Neu /error can dang nhap thi 500 that bi bien thanh 401
+                    // "thieu hoac sai token" (vd Redis sap -> RateLimitFilter loi -> login bao 401 sai).
+                    auth.requestMatchers("/error").permitAll();
                     // Webhook cong thanh toan: goi server-to-server (khong co JWT) -> xac thuc bang
                     // chu ky HMAC trong PaymentService, KHONG bao ve bang Spring Security.
                     auth.requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll();

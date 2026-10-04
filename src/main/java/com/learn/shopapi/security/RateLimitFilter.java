@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -33,6 +35,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "local c = redis.call('INCR', KEYS[1]); "
                     + "if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return c",
             Long.class);
+
+    private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
     private final boolean enabled;
     private final int maxPerMinute;
@@ -78,7 +82,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private boolean isOverLimit(String ip) {
         long minute = Instant.now().getEpochSecond() / 60;
         String key = "shop:ratelimit:auth:" + ip + ":" + minute;
-        Long count = redis.execute(INCR_WITH_TTL, List.of(key), "60");
-        return count != null && count > maxPerMinute;
+        try {
+            Long count = redis.execute(INCR_WITH_TTL, List.of(key), "60");
+            return count != null && count > maxPerMinute;
+        } catch (RuntimeException ex) {
+            // FAIL-OPEN: Redis sap/mat ket noi thi tam bo gioi han thay vi lam hong toan bo
+            // dang nhap/dang ky (truoc day: moi request auth deu loi). Readiness van bao DOWN.
+            log.warn("Rate limit tam tat vi Redis loi: {}", ex.toString());
+            return false;
+        }
     }
 }
