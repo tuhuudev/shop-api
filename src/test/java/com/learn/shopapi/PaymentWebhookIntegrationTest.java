@@ -13,6 +13,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 
@@ -42,11 +43,12 @@ class PaymentWebhookIntegrationTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "customer", roles = "CUSTOMER")
     void webhook_chuKyDung_chuyenDonSangPaid_vaIdempotent() throws Exception {
-        long orderId = createPendingOrder();
+        var order = createPendingOrder();
+        long orderId = order.id();
 
         String ref = "pay-it-1";
-        String sig = sign(ref + "|" + orderId + "|100|SUCCEEDED");
-        String body = webhookBody(ref, orderId);
+        String sig = sign(ref + "|" + orderId + "|" + order.total() + "|SUCCEEDED");
+        String body = webhookBody(ref, orderId, order.total());
 
         // Lan 1: 200, payment SUCCEEDED
         mockMvc.perform(post("/api/payments/webhook")
@@ -71,27 +73,51 @@ class PaymentWebhookIntegrationTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(username = "customer", roles = "CUSTOMER")
     void webhook_chuKySai_tra401() throws Exception {
-        long orderId = createPendingOrder();
+        var order = createPendingOrder();
         mockMvc.perform(post("/api/payments/webhook")
                         .header("X-Signature", "deadbeef")
-                        .contentType(MediaType.APPLICATION_JSON).content(webhookBody("pay-bad", orderId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(webhookBody("pay-bad", order.id(), order.total())))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "customer", roles = "CUSTOMER")
+    void webhook_thanhToanThieu_donVanPending() throws Exception {
+        long orderId = createPendingOrder().id();
+
+        String ref = "pay-it-underpaid";
+        mockMvc.perform(post("/api/payments/webhook")
+                        .header("X-Signature", sign(ref + "|" + orderId + "|1|SUCCEEDED"))
+                        .contentType(MediaType.APPLICATION_JSON).content(webhookBody(ref, orderId, "1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"));   // van luu ban ghi de doi soat
+
+        mockMvc.perform(get("/api/orders/" + orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     // ---- helpers ----
 
-    private long createPendingOrder() throws Exception {
+    private record CreatedOrder(long id, String total) {}
+
+    private CreatedOrder createPendingOrder() throws Exception {
         var res = mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"items\":[{\"productId\":1,\"quantity\":1}]}"))
                 .andExpect(status().isCreated())
                 .andReturn();
-        return ((Number) JsonPath.read(res.getResponse().getContentAsString(), "$.id")).longValue();
+        String json = res.getResponse().getContentAsString();
+        long id = ((Number) JsonPath.read(json, "$.id")).longValue();
+        // toPlainString giong PaymentService (chuoi ky): 1290000 chu khong phai 1.29E+6
+        String total = new BigDecimal(JsonPath.read(json, "$.totalAmount").toString()).toPlainString();
+        return new CreatedOrder(id, total);
     }
 
-    private String webhookBody(String ref, long orderId) {
+    private String webhookBody(String ref, long orderId, String amount) {
         return "{\"providerRef\":\"" + ref + "\",\"orderId\":" + orderId
-                + ",\"amount\":100,\"status\":\"SUCCEEDED\"}";
+                + ",\"amount\":" + amount + ",\"status\":\"SUCCEEDED\"}";
     }
 
     private static String sign(String data) throws Exception {

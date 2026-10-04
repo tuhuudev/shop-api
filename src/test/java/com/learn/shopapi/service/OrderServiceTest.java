@@ -209,4 +209,47 @@ class OrderServiceTest {
         verify(productRepository).incrementStock(any(), eq(2));   // hoan 2 ve kho atomic
         verify(inventoryMovementRepository).save(any());          // ghi nhat ky restock
     }
+
+    // ---- confirmPaid (webhook cong thanh toan) ----
+
+    private Order pendingOrder200() {
+        Product kb = new Product("Ban phim", "desc", new BigDecimal("100"), 5, null);
+        Order order = new Order(new Customer("An", "an@example.com"));
+        order.addItem(new OrderItem(kb, 2));   // tong 200
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        return order;
+    }
+
+    @Test
+    void confirmPaid_duTien_chuyenPAID() {
+        Order order = pendingOrder200();
+
+        assertThat(orderService.confirmPaid(1L, new BigDecimal("200.00"))).isTrue();   // scale khac van khop
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    void confirmPaid_thieuTien_giuPENDING() {
+        Order order = pendingOrder200();
+
+        assertThat(orderService.confirmPaid(1L, new BigDecimal("1"))).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+    }
+
+    @Test
+    void confirmPaid_khongCoSoTien_giuPENDING() {
+        Order order = pendingOrder200();
+
+        assertThat(orderService.confirmPaid(1L, null)).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+    }
+
+    @Test
+    void confirmPaid_donDaHuy_khongDoi() {
+        Order order = pendingOrder200();
+        order.setStatus(OrderStatus.CANCELLED);
+
+        assertThat(orderService.confirmPaid(1L, new BigDecimal("200"))).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
 }
