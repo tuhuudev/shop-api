@@ -10,14 +10,20 @@ import com.learn.shopapi.repository.InventoryMovementRepository;
 import com.learn.shopapi.repository.OrderRepository;
 import com.learn.shopapi.repository.ProductRepository;
 import com.learn.shopapi.security.SecurityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 @Service
 public class OrderService {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
     private final OrderRepository orderRepository;
     private final CustomerRepository customerRepository;
@@ -198,15 +204,25 @@ public class OrderService {
     /**
      * Xac nhan da thanh toan tu CONG THANH TOAN (webhook) - KHONG kiem security context (server-to-server).
      * Idempotent: don da PAID tro len -> bo qua. Goi trong tx cua PaymentService.
+     * So tien cong bao phai KHOP tong don: thanh toan thieu/sai -> giu PENDING de nguoi doi soat xu ly
+     * (khong nem loi: ban ghi Payment van duoc luu de doi soat + callback lap lai van idempotent).
+     *
+     * @return true neu don duoc chuyen sang PAID o lan goi nay
      */
     @Transactional
-    public void confirmPaid(Long orderId) {
+    public boolean confirmPaid(Long orderId, BigDecimal paidAmount) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don hang id=" + orderId));
-        if (order.getStatus() == OrderStatus.PENDING) {
-            order.setStatus(OrderStatus.PAID);
+        if (order.getStatus() != OrderStatus.PENDING) {
+            return false; // Da PAID/khac -> khong lam gi (callback trung hoac don da xu ly).
         }
-        // Da PAID/khac -> khong lam gi (callback trung hoac don da xu ly).
+        if (paidAmount == null || paidAmount.compareTo(order.getTotalAmount()) != 0) {
+            log.warn("Webhook bao so tien {} khac tong don {} (orderId={}) -> giu PENDING",
+                    paidAmount, order.getTotalAmount(), orderId);
+            return false;
+        }
+        order.setStatus(OrderStatus.PAID);
+        return true;
     }
 
     // ---- helper ----

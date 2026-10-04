@@ -25,7 +25,7 @@ import java.util.HexFormat;
  * - Xac thuc: chu ky HMAC-SHA256 tren chuoi chuan providerRef|orderId|amount|status voi shared secret.
  *   (Cong that thuong ky tren RAW body; o day ky tren chuoi field cho don gian, de doi sang raw sau.)
  * - Idempotency: provider_ref DUY NHAT -> callback trung tra ve ket qua cu, khong xu ly 2 lan.
- * - status=SUCCEEDED -> xac nhan don sang PAID (qua OrderService.confirmPaid, idempotent).
+ * - status=SUCCEEDED -> xac nhan don sang PAID (qua OrderService.confirmPaid, idempotent; so tien phai khop tong don).
  */
 @Service
 public class PaymentService {
@@ -67,7 +67,7 @@ public class PaymentService {
                 new Payment(req.orderId(), PROVIDER, req.providerRef(), req.amount(), req.status()));
 
         if (req.status() == PaymentStatus.SUCCEEDED) {
-            orderService.confirmPaid(req.orderId());
+            orderService.confirmPaid(req.orderId(), req.amount());
         }
         return PaymentResponse.from(payment);
     }
