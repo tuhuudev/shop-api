@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  False positive cua OWASP dependency-check (khop CPE sai san pham). Moi muc ghi ro vi sao.
+  Chi suppress theo CVE + dung jar; khi nang version thi xem lai file nay.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <suppress>
+        <notes><![CDATA[
+        CVE-2025-7962: SMTP injection trong Jakarta Mail < 2.0.2 / Angus MAIL < 2.0.4.
+        App chi co angus-ACTIVATION (JAF, keo theo boi jakarta.activation), khong dung Angus Mail.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.eclipse\.angus/angus-activation@.*$</packageUrl>
+        <cve>CVE-2025-7962</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+        CVE-2026-42154: DoS o endpoint /api/v1/read cua Prometheus SERVER (Go) < 3.5.3 / 3.11.3.
+        micrometer-registry-prometheus la thu vien Java xuat metrics, khong phai Prometheus server.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.micrometer/micrometer-registry-prometheus@.*$</packageUrl>
+        <cve>CVE-2026-42154</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+        CVE-2026-39883: PATH hijacking (lenh kenv tren BSD/Solaris) trong OpenTelemetry-GO 1.15.0-1.42.0.
+        opentelemetry-semconv la jar Java chi chua hang so semantic conventions, khong goi lenh he thong.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv@.*$</packageUrl>
+        <cve>CVE-2026-39883</cve>
+    </suppress>
+</suppressions>
