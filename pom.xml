@@ -361,6 +361,10 @@
 							<!-- Tat OSS Index analyzer: can tai khoan Sonatype, khong co se 401 -> fail build.
 							     NVD van la nguon CVE chinh nen tat cai nay khong giam dang ke do bao phu. -->
 							<ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
+							<!-- False positive da kiem tra tay (khop CPE sai san pham), co ghi ly do tung CVE. -->
+							<suppressionFiles>
+								<suppressionFile>${project.basedir}/config/dependency-check/suppressions.xml</suppressionFile>
+							</suppressionFiles>
 							<formats>
 								<format>HTML</format>
 								<format>JSON</format>
