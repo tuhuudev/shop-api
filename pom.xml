@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.1.0</version>
+		<version>4.1.1</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.learn</groupId>
@@ -34,7 +34,12 @@
 		<springdoc.version>2.8.6</springdoc.version>
 		<!-- Ghi de swagger-ui webjar: springdoc 2.8.6 keo 5.20.1 (DOMPurify dinh CVE).
 		     Nang len ban vUI moi nhat (DOMPurify da va) - xem OWASP report. -->
-		<swagger-ui.version>5.25.3</swagger-ui.version>
+		<swagger-ui.version>5.33.1</swagger-ui.version>
+		<!-- Ghim patch moi hon ban Boot 4.1.1 quan ly (OWASP dependency-check bao CVE CVSS>=7
+		     o tomcat 11.0.22-24, netty 4.2.15-17, kotlin-stdlib 2.3.21). Bo khi Boot len ban moi hon. -->
+		<tomcat.version>11.0.26</tomcat.version>
+		<netty.version>4.2.18.Final</netty.version>
+		<kotlin.version>2.4.20</kotlin.version>
 		<testcontainers.version>1.21.3</testcontainers.version>
 	</properties>
 
